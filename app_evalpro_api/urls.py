@@ -2,12 +2,27 @@ from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
+
+# Importamos nuestras vistas refactorizadas
 from .views.bootstrap import VersionView
+from .views.teachers import TeachersView
+from .views.students import StudentsView
+from .views.auth import CustomAuthToken, Logout
 
 urlpatterns = [
-    path("admin/", admin.site.urls),
-    path("api-auth/", include("rest_framework.urls")),
-    path("api/version/", VersionView.as_view(), name="api-version"),
+    
+    path('admin/', admin.site.urls),
+
+    # Endpoints para Maestros
+    path("teachers/", TeachersView.as_view(), name="teacher-register"),
+    
+    # Endpoints para Alumnos
+    path("students/", StudentsView.as_view(), name="student-register"),
+
+    #login
+    path("login/", CustomAuthToken.as_view(), name="login"),
+    
+    path("logout/", Logout.as_view(), name="logout")
 ]
 
 if settings.DEBUG:
