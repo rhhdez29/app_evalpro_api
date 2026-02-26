@@ -49,3 +49,38 @@ class Student(models.Model):
 
     def __str__(self):
         return f"Alumno: {self.user.first_name} {self.user.last_name} - {self.career}"
+
+class Subject(models.Model):
+    id = models.BigAutoField(primary_key=True)
+
+    #Datos de la materia
+    name = models.CharField(max_length=255, verbose_name="Nombre de la Materia")
+    code = models.CharField(max_length=20, verbose_name="Código de la Materia")
+    department = models.CharField(max_length=255, verbose_name="Departamento/Area")
+
+    #color recuadro materia
+    color = models.CharField(max_length=50, default="bg-blue-500", verbose_name="Color Materia")
+
+    #Relacion con el creador Admin o Maestro
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="created_subjects",
+        verbose_name="Creado por"
+    )
+
+    # Relación con los alumnos (Muchos alumnos pueden tener muchas materias)
+    # blank=True permite que al crear la materia pueda estar vacía (sin alumnos aún)
+    students = models.ManyToManyField(
+        Student, 
+        blank=True, 
+        related_name="enrolled_subjects",
+        verbose_name="Alumnos Inscritos"
+    )
+
+    # Campos de auditoría
+    creation = models.DateTimeField(auto_now_add=True)
+    update = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.code} - {self.name}"

@@ -7,6 +7,7 @@ from django.conf.urls.static import static
 from .views.bootstrap import VersionView
 from .views.teachers import TeachersView
 from .views.students import StudentsView
+from .views.subjects import SubjectListCreateView
 from .views.auth import CustomAuthToken, Logout
 
 urlpatterns = [
@@ -18,6 +19,9 @@ urlpatterns = [
     
     # Endpoints para Alumnos
     path("students/", StudentsView.as_view(), name="student-register"),
+
+    #Enpoint para materias
+    path("subjects/", SubjectListCreateView.as_view(), name="subject-list-create"),
 
     #login
     path("login/", CustomAuthToken.as_view(), name="login"),
