@@ -84,3 +84,68 @@ class Subject(models.Model):
 
     def __str__(self):
         return f"{self.code} - {self.name}"
+    
+class Exam(models.Model):
+
+    STATUS_EXAM = (
+        ('draft', 'Draft'),
+        ('scheduled', 'Scheduled'),
+        ('published', 'Published'),
+        ('closed', 'Closed')
+    )
+
+    #Relaciones
+    subject = models.ForeignKey('Subject', on_delete=models.CASCADE, related_name='exams')
+    created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='created_exams')
+
+    #Campos base
+
+    title = models.CharField(max_length=255)
+    description = models.TextField(blank=True)
+
+    #fechas y tiempo
+    start_date = models.DateTimeField(help_text='Fecha y hora en que se abre el examen')
+    end_date = models.DateTimeField(help_text='Fecha y hora en que se cierra el examen')
+    duration_minutes = models.PositiveIntegerField(help_text='Duración del examen en minutos')
+    total_score = models.DecimalField(max_digits=5, decimal_places=2, default=0.00, help_text='Puntaje total del examen')
+    status = models.CharField(max_length=20, choices=STATUS_EXAM, default='draft', help_text='Estado del examen')
+
+    def __str__(self):
+        return f"{self.title}-{self.subject.name}"
+    
+class Question(models.Model):
+    #Tipos de preguntas
+    QUESTION_TYPES =(
+        ('MCQ', 'Multiple Choice'),
+        ('TF', 'True/False'),
+        ('MATCH','Statement Matching'),
+        ('CODE', 'Code Editor')
+    )
+
+    exam = models.ForeignKey('Exam', on_delete=models.CASCADE, related_name='questions')
+    question_type = models.CharField(max_length=10, choices=QUESTION_TYPES)
+
+    #Texto principal
+    prompt = models.TextField()
+
+    #puntos que vale la pregunta
+    points = models.DecimalField(max_digits=5, decimal_places=2, default=1.00)
+
+    #Aqui guardamos la configuracion espefica dependiendo del tipo de pregunta
+    metadata = models.JSONField(default=dict, blank=True, help_text='Configuracion espeficica del tipo de pregunta')
+
+    order = models.PositiveIntegerField(default=0, help_text='Orden de la pregunta en el examen')
+
+    class Meta:
+        ordering = ['order']
+
+    def __str__(self):
+        return f"{self.get_question_type_display()} - {self.prompt[:30]}"
+    
+class AnswerOption(models.Model):
+    question = models.ForeignKey(Question ,on_delete=models.CASCADE, related_name='options')
+    text = models.CharField(max_length=255)
+    is_correct = models.BooleanField(default=False)
+
+    def __str__(self):
+        return self.text

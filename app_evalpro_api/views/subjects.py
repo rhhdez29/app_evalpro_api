@@ -1,22 +1,34 @@
+
+from rest_framework import viewsets
+from rest_framework.permissions import IsAuthenticated
 from rest_framework import generics, permissions
 from app_evalpro_api.models import Subject
-from app_evalpro_api.serializers import SubjectSerializer
+from app_evalpro_api.serializers import SubjectListSerializer, SubjectDetailSerializer
 
-class SubjectListCreateView(generics.ListCreateAPIView):
-    serializer_class = SubjectSerializer
-    # Obligamos a que tengan un token válido (estar logueados)
-    permission_classes = [permissions.IsAuthenticated]
+
+class SubjectViewSet(viewsets.ModelViewSet):
+
+    # Protegemos la ruta para que solo usuarios logueados la vean
+    permission_classes = [IsAuthenticated] 
 
     def get_queryset(self):
         user = self.request.user
-        
-        # Si es administrador, tal vez quieras que vea TODAS las materias
+
+        # Si es administrador, se veran TODAS las materias
         if user.groups.filter(name='administrador').exists():
             return Subject.objects.all()
             
         # Si es maestro, SOLO ve las materias que él creó
         return Subject.objects.filter(created_by=user)
 
+    def get_serializer_class(self):
+        # este serializador pesado solo cuando piden el detalle (ID)
+        if self.action == 'retrieve':
+            return SubjectDetailSerializer
+        
+        # Si es un GET normal (lista), puedes retornar un SubjectListSerializer más básico
+        return SubjectListSerializer
+    
     def perform_create(self, serializer):
         # Al crear la materia, le asignamos automáticamente como dueño al usuario del token
         serializer.save(created_by=self.request.user)
