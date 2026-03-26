@@ -146,6 +146,7 @@ class AnswerOption(models.Model):
     question = models.ForeignKey(Question ,on_delete=models.CASCADE, related_name='options')
     text = models.CharField(max_length=255)
     is_correct = models.BooleanField(default=False)
+    partial_points = models.DecimalField(max_digits=5, decimal_places=2, default=0.00)
 
     def __str__(self):
         return self.text

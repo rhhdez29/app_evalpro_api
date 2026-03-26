@@ -1,4 +1,5 @@
 from django.contrib.auth.models import User
+from django.db import transaction
 from rest_framework import serializers
 from .models import Teacher, Student, Administrator, Subject, Exam, Question, AnswerOption
 
@@ -117,12 +118,14 @@ class AswerQuestionSerializer(serializers.ModelSerializer):
             'id', 
             'question', 
             'text', 
-            'is_correct'
+            'is_correct', 
+            'partial_points'
         ]
 
 class QuestionSerializer(serializers.ModelSerializer):
 
     options = AswerQuestionSerializer(many=True, read_only=True)
+    exam = serializers.PrimaryKeyRelatedField(read_only=True)
     class Meta:
         model = Question
         fields = [
@@ -137,7 +140,7 @@ class QuestionSerializer(serializers.ModelSerializer):
         ]
 
 class ExamDetailSerializer(serializers.ModelSerializer):
-    questions = QuestionSerializer(many=True, read_only=True)
+    questions = QuestionSerializer(many=True, read_only=False)
 
     class Meta:
         model = Exam
@@ -153,6 +156,28 @@ class ExamDetailSerializer(serializers.ModelSerializer):
             'duration_minutes',
             'questions'
         ]
+
+    @transaction.atomic #si falla una pregunta, no se guarda el examen a medias
+    def create(self, validated_data):
+
+        # 2. Extraemos el arreglo de preguntas del paquete de datos
+        questions_data = validated_data.pop('questions', [])
+
+        # 3. Creamos la metadata del Examen
+        exam = Exam.objects.create(**validated_data)
+        
+        # 4. Iteramos sobre las preguntas y las creamos enlazándolas al examen
+        for question_data in questions_data:
+
+            options_data = question_data.pop('options', [])
+
+            Question.objects.create(exam=exam, **question_data)
+
+            for option_data in options_data:
+                AnswerOption.objects.create(question=question, **option_data)
+            
+        # 5. Devolvemos el examen recién creado (Django se encargará de responder con el JSON)
+        return exam
 
 class ExamListSerializer(serializers.ModelSerializer):
     questions_count = serializers.SerializerMethodField()

@@ -1,7 +1,8 @@
-from rest_framework import viewsets
+from rest_framework import viewsets, status
 from rest_framework.permissions import IsAuthenticated
 from app_evalpro_api.models import Exam, Question, AnswerOption
 from app_evalpro_api.serializers import (ExamDetailSerializer, ExamListSerializer, QuestionSerializer, AswerQuestionSerializer)
+from rest_framework.response import Response
 
 
 class ExamViewSet(viewsets.ModelViewSet):
@@ -33,6 +34,18 @@ class ExamViewSet(viewsets.ModelViewSet):
     
     def perform_create(self, serializer):
         serializer.save(created_by=self.request.user)
+
+    def destroy(self, request, *args, **kwargs):
+        exam = self.get_object()
+        
+        if exam.created_by != request.user:
+            return Response(
+                {"error": "No tienes permiso para eliminar este examen."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        exam.delete()
+        
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 class QuestionViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]

@@ -20,6 +20,10 @@ router.register(r'exams', ExamViewSet, basename='exam');
 router.register(r'questions', QuestionViewSet, basename='question')
 router.register(r'options', AnswerOptionViewSet, basename='option')
 
+# {{http}}://{{host}}/exams/?subject=4 obtener los examenes de una materia
+# {{http}}://{{host}}/exams/10/ obtener un examen por id
+# {{http}}://{{host}}/exams/ obtener todos los examenes
+
 urlpatterns = [
     
     path('', include(router.urls)),
