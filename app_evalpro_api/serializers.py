@@ -112,6 +112,9 @@ class SubjectDetailSerializer(serializers.ModelSerializer):
     
 
 class AswerQuestionSerializer(serializers.ModelSerializer):
+
+    id = serializers.IntegerField(required=False, allow_null=True)
+    question = serializers.PrimaryKeyRelatedField(read_only=True)
     class Meta:
         model = AnswerOption
         fields = [
@@ -124,7 +127,8 @@ class AswerQuestionSerializer(serializers.ModelSerializer):
 
 class QuestionSerializer(serializers.ModelSerializer):
 
-    options = AswerQuestionSerializer(many=True, read_only=True)
+    id = serializers.IntegerField(required=False, allow_null=True)
+    options = AswerQuestionSerializer(many=True, required=False)
     exam = serializers.PrimaryKeyRelatedField(read_only=True)
     class Meta:
         model = Question
@@ -169,15 +173,70 @@ class ExamDetailSerializer(serializers.ModelSerializer):
         # 4. Iteramos sobre las preguntas y las creamos enlazándolas al examen
         for question_data in questions_data:
 
-            options_data = question_data.pop('options', [])
+            print(question_data)
 
-            Question.objects.create(exam=exam, **question_data)
+            options_data = question_data.pop('options', [])
+            
+            question = Question.objects.create(exam=exam, **question_data)
 
             for option_data in options_data:
                 AnswerOption.objects.create(question=question, **option_data)
             
         # 5. Devolvemos el examen recién creado (Django se encargará de responder con el JSON)
         return exam
+
+    @transaction.atomic
+    def update(self, instance, validated_data):
+        
+        questions_data = validated_data.pop('questions', None)
+
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+
+        instance.save()
+
+        if questions_data is not None:
+            incoming_questions_ids = []
+
+            for q_data in questions_data:
+                q_id = q_data.get('id')
+                options_data = q_data.pop('options', [])
+
+                if q_id:
+                    question = Question.objects.get(id=q_id, exam=instance)
+                    for attr, value in q_data.items():
+                        setattr(question, attr, value)
+                    question.save()
+
+                    incoming_questions_ids.append(question.id)
+
+                else:
+                    question = Question.objects.create(exam=instance, **q_data)
+                    incoming_questions_ids.append(question.id)
+
+                incoming_options_ids = []
+                for opt_data in options_data:
+                    opt_id = opt_data.get('id', None)
+                
+                    if opt_id:
+                        option = AnswerOption.objects.get(id=opt_id, question=question)
+                        for attr, value in opt_data.items():
+                            setattr(option, attr, value)
+                        option.save()
+                        incoming_options_ids.append(option.id)
+                    else:
+                        option = AnswerOption.objects.create(question=question, **opt_data)
+                        incoming_options_ids.append(option.id)
+
+                question.options.exclude(id__in=incoming_options_ids).delete()
+            
+            instance.questions.exclude(id__in=incoming_questions_ids).delete()
+            
+        return instance
+                    
+                    
+
+
 
 class ExamListSerializer(serializers.ModelSerializer):
     questions_count = serializers.SerializerMethodField()
