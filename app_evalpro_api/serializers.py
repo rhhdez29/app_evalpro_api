@@ -187,21 +187,26 @@ class ExamDetailSerializer(serializers.ModelSerializer):
 
     @transaction.atomic
     def update(self, instance, validated_data):
-        
+        #Extraemos las preguntas
         questions_data = validated_data.pop('questions', None)
 
+        #Actualizamos el examen
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
 
         instance.save()
 
+        #Actualizamos las preguntas
         if questions_data is not None:
+            #Lista para guardar los ids de las preguntas que vienen en el paquete
             incoming_questions_ids = []
 
+            #Iteramos sobre las preguntas
             for q_data in questions_data:
                 q_id = q_data.get('id')
                 options_data = q_data.pop('options', [])
 
+                #Si la pregunta tiene id, la actualizamos
                 if q_id:
                     question = Question.objects.get(id=q_id, exam=instance)
                     for attr, value in q_data.items():
@@ -211,13 +216,16 @@ class ExamDetailSerializer(serializers.ModelSerializer):
                     incoming_questions_ids.append(question.id)
 
                 else:
+                    #Si la pregunta no tiene id, la creamos
                     question = Question.objects.create(exam=instance, **q_data)
                     incoming_questions_ids.append(question.id)
 
+                #Lista para guardar los ids de las opciones
                 incoming_options_ids = []
                 for opt_data in options_data:
                     opt_id = opt_data.get('id', None)
                 
+                    #Si la opción tiene id, la actualizamos
                     if opt_id:
                         option = AnswerOption.objects.get(id=opt_id, question=question)
                         for attr, value in opt_data.items():
@@ -225,11 +233,14 @@ class ExamDetailSerializer(serializers.ModelSerializer):
                         option.save()
                         incoming_options_ids.append(option.id)
                     else:
+                            #Si la opción no tiene id, la creamos
                         option = AnswerOption.objects.create(question=question, **opt_data)
                         incoming_options_ids.append(option.id)
 
+                #Eliminamos las opciones que no vienen en el paquete
                 question.options.exclude(id__in=incoming_options_ids).delete()
             
+            #Eliminamos las preguntas que no vienen en el paquete
             instance.questions.exclude(id__in=incoming_questions_ids).delete()
             
         return instance
@@ -260,3 +271,28 @@ class ExamListSerializer(serializers.ModelSerializer):
         
         return 0
     
+class UserListSerializer(serializers.ModelSerializer):
+
+    complete_name = serializers.SerializerMethodField()
+    
+    status = serializers.BooleanField(source='is_active')
+    role = serializers.SerializerMethodField()
+
+    class Meta:
+        model = User
+        fields = [
+            'id',
+            'complete_name',
+            'email',
+            'role',
+            'status'
+        ]
+
+    def get_complete_name(self, obj):
+        return f"{obj.first_name} {obj.last_name}"
+
+    def get_role(self, obj):
+        grupo = obj.groups.first()
+        if grupo:
+            return grupo.name
+        return "Sin Rol"

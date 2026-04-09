@@ -10,6 +10,7 @@ from .views.teachers import TeachersView
 from .views.students import StudentsView
 from .views.subjects import SubjectViewSet
 from .views.exams import ExamViewSet, QuestionViewSet, AnswerOptionViewSet
+from .views.users import UserListViewSet
 from .views.auth import CustomAuthToken, Logout
 
 # Creamos el enrutador de DRF
@@ -19,6 +20,7 @@ router.register(r'subjects', SubjectViewSet, basename='subject')
 router.register(r'exams', ExamViewSet, basename='exam');
 router.register(r'questions', QuestionViewSet, basename='question')
 router.register(r'options', AnswerOptionViewSet, basename='option')
+router.register(r'users', UserListViewSet, basename='user')
 
 # {{http}}://{{host}}/exams/?subject=4 obtener los examenes de una materia
 # {{http}}://{{host}}/exams/10/ obtener un examen por id
