@@ -275,7 +275,7 @@ class UserListSerializer(serializers.ModelSerializer):
 
     complete_name = serializers.SerializerMethodField()
     
-    status = serializers.BooleanField(source='is_active')
+    status = serializers.BooleanField(source='is_active', read_only=True)
     role = serializers.SerializerMethodField()
 
     class Meta:
