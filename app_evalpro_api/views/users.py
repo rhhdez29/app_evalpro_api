@@ -29,8 +29,18 @@ class UserListViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        usuario.delete()
+        user.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @action(detail=False, methods=['get'])
+    def pending_teachers(self, request):
+        
+        pending_teachers = User.objects.filter(
+            teacher_profile__status='pending'
+        ).order_by('-date_joined')
+
+        serializer = self.get_serializer(pending_teachers, many=True)
+        return Response(serializer.data)
 
     @action(detail=True, methods=['patch'])
     def toggle_status(self, request, pk=None):

@@ -10,6 +10,15 @@ class CustomAuthToken(ObtainAuthToken):
         serializer.is_valid(raise_exception=True)
         user = serializer.validated_data['user']
         
+        teacher = getattr(user, 'teacher_profile', None)
+        
+        if teacher:
+            estado = teacher.status
+            if estado == 'pending':
+                return Response({"error": "Tu cuenta no ha sido aprobada por el administrador."}, status=status.HTTP_401_UNAUTHORIZED)
+            if estado == 'rejected':
+                return Response({"error": "Tu cuenta ha sido rechazada por el administrador."}, status=status.HTTP_401_UNAUTHORIZED)
+
         if user.is_active:
             role_names = [role.name for role in user.groups.all()]
 

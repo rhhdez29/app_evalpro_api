@@ -275,6 +275,7 @@ class UserListSerializer(serializers.ModelSerializer):
 
     complete_name = serializers.SerializerMethodField()
     
+    status_teacher = serializers.CharField(source='teacher_profile.status', read_only=True)
     status = serializers.BooleanField(source='is_active', read_only=True)
     role = serializers.SerializerMethodField()
 
@@ -285,6 +286,7 @@ class UserListSerializer(serializers.ModelSerializer):
             'complete_name',
             'email',
             'role',
+            'status_teacher',
             'status'
         ]
 

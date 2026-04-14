@@ -21,10 +21,18 @@ class Administrator(models.Model):
         return f"Admin: {self.user.first_name} {self.user.last_name} - {self.faculty}"
 
 class Teacher(models.Model):
+
+    STATUS_CHOICES = (
+        ('pending', 'Pendiente'),
+        ('active', 'Activo'),
+        ('rejected', 'Rechazado')
+    )
+
     id = models.BigAutoField(primary_key=True)
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="teacher_profile")
     id_teacher = models.CharField(max_length=50, unique=True, verbose_name="Matrícula/ID del Maestro")
     faculty = models.CharField(max_length=255, verbose_name="Facultad")
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
     creation = models.DateTimeField(auto_now_add=True, null=True, blank=True)
     update = models.DateTimeField(auto_now=True, null=True, blank=True)
 
