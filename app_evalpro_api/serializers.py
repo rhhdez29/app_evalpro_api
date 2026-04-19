@@ -274,8 +274,6 @@ class ExamListSerializer(serializers.ModelSerializer):
 class UserListSerializer(serializers.ModelSerializer):
 
     complete_name = serializers.SerializerMethodField()
-    
-    status_teacher = serializers.CharField(source='teacher_profile.status', read_only=True)
     status = serializers.BooleanField(source='is_active', read_only=True)
     role = serializers.SerializerMethodField()
 
@@ -286,7 +284,6 @@ class UserListSerializer(serializers.ModelSerializer):
             'complete_name',
             'email',
             'role',
-            'status_teacher',
             'status'
         ]
 
@@ -295,6 +292,46 @@ class UserListSerializer(serializers.ModelSerializer):
 
     def get_role(self, obj):
         grupo = obj.groups.first()
+        if grupo:
+            return grupo.name
+        return "Sin Rol"
+
+
+#Serializador para obtener los docentes pendientes de aprobación
+class PendingTeacherSerializer(serializers.ModelSerializer):
+
+    id = serializers.IntegerField(source='user.id', read_only=True)
+
+    #Campos del modelo User
+    complete_name = serializers.SerializerMethodField()
+    email = serializers.CharField(source='user.email', read_only=True)
+    role = serializers.SerializerMethodField()
+    date_joined = serializers.DateTimeField(source='user.date_joined', read_only=True)
+    
+
+    class Meta:
+        #Modelo Teacher
+        model = Teacher
+        fields = [
+            'id',
+            'complete_name',
+            'email',
+            'faculty',
+            'id_teacher',
+            'role',
+            'date_joined',
+            'status',
+        ]
+
+    #Método para obtener el nombre completo del usuario
+    def get_complete_name(self, obj):
+        user = obj.user
+        return f"{user.first_name} {user.last_name}"
+
+    #Método para obtener el rol del usuario
+    def get_role(self, obj):
+        user = obj.user
+        grupo = user.groups.first()
         if grupo:
             return grupo.name
         return "Sin Rol"
