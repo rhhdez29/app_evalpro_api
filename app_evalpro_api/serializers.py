@@ -1,7 +1,7 @@
 from django.contrib.auth.models import User
 from django.db import transaction
 from rest_framework import serializers
-from .models import Teacher, Student, Administrator, Subject, Exam, Question, AnswerOption
+from .models import Teacher, Student, Administrator, Subject, Exam, Question, AnswerOption, SubjectEnrollment
 
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
@@ -337,11 +337,21 @@ class PendingTeacherSerializer(serializers.ModelSerializer):
         return "Sin Rol"
 
 class EnrolledStudentSerializer(serializers.ModelSerializer):
-    # Traemos datos legibles desde el User
-    first_name = serializers.CharField(source='user.first_name', read_only=True)
-    last_name = serializers.CharField(source='user.last_name', read_only=True)
-    email = serializers.EmailField(source='user.email', read_only=True)
+    # 🌟 1. Corregimos las rutas: Todo debe pasar por 'student' primero
+    id = serializers.CharField(source='student.id', read_only=True)
+    email = serializers.EmailField(source='student.user.email', read_only=True)
+
+    name = serializers.SerializerMethodField()
+
+    def get_name(self, obj):
+        return f"{obj.student.user.first_name} {obj.student.user.last_name}"
+
+    date_enrolled = serializers.DateTimeField(
+        read_only=True, 
+        format="%Y-%m-%d %H:%M"
+    )
 
     class Meta:
-        model = Student
-        fields = ['id_student', 'first_name', 'last_name', 'email']
+        # 🌟 2. Cambiamos Student por SubjectEnrollment
+        model = SubjectEnrollment
+        fields = ['id', 'name', 'email', 'date_enrolled']

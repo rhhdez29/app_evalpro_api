@@ -2,10 +2,9 @@
 from rest_framework import viewsets, status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework import generics, permissions
-from app_evalpro_api.models import Subject
+from app_evalpro_api.models import Subject, SubjectEnrollment, Student
 from app_evalpro_api.serializers import SubjectListSerializer, SubjectDetailSerializer, EnrolledStudentSerializer
 from rest_framework.response import Response
-from app_evalpro_api.models import Student
 from rest_framework.decorators import action
 
 class SubjectViewSet(viewsets.ModelViewSet):
@@ -120,17 +119,17 @@ class SubjectViewSet(viewsets.ModelViewSet):
         subject = self.get_object()
         
         # 2. Obtenemos todos los estudiantes vinculados a esta materia
-        # Usamos select_related('user') para que la consulta sea rápida (un solo JOIN)
-        students = subject.students.all().select_related('user')
-        
+        enrollments = SubjectEnrollment.objects.filter(
+            subject=subject
+        ).select_related('student__user')
         #3. si no hay alumnos lanzamos ese mensaje
-        if not students.exists():
+        if not enrollments.exists():
             return Response(
                 {"message": "Esta materia aun no tiene alumnos inscriptos"},
                 status=status.HTTP_200_OK
             )
 
         # 4. Si hay alumnos mandamos la lista 
-        serializer = EnrolledStudentSerializer(students, many=True)
+        serializer = EnrolledStudentSerializer(enrollments, many=True)
         
         return Response(serializer.data)

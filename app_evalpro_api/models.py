@@ -82,6 +82,7 @@ class Subject(models.Model):
     students = models.ManyToManyField(
         Student, 
         blank=True, 
+        through='SubjectEnrollment',
         related_name="enrolled_subjects",
         verbose_name="Alumnos Inscritos"
     )
@@ -158,3 +159,13 @@ class AnswerOption(models.Model):
 
     def __str__(self):
         return self.text
+
+class SubjectEnrollment(models.Model):
+    subject = models.ForeignKey('Subject', on_delete=models.CASCADE)
+    student = models.ForeignKey('Student', on_delete=models.CASCADE)
+    
+    date_enrolled = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('subject', 'student')
+        ordering = ['-date_enrolled']
