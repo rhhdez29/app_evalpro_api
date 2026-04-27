@@ -335,3 +335,13 @@ class PendingTeacherSerializer(serializers.ModelSerializer):
         if grupo:
             return grupo.name
         return "Sin Rol"
+
+class EnrolledStudentSerializer(serializers.ModelSerializer):
+    # Traemos datos legibles desde el User
+    first_name = serializers.CharField(source='user.first_name', read_only=True)
+    last_name = serializers.CharField(source='user.last_name', read_only=True)
+    email = serializers.EmailField(source='user.email', read_only=True)
+
+    class Meta:
+        model = Student
+        fields = ['id_student', 'first_name', 'last_name', 'email']
