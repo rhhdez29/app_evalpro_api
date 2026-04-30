@@ -6,6 +6,7 @@ from rest_framework.parsers import MultiPartParser, FormParser
 from django.contrib.auth.models import Group, User
 from app_evalpro_api.models import Student
 from app_evalpro_api.serializers import StudentSerializer
+from rest_framework.decorators import action
 
 class StudentsView(generics.CreateAPIView):
     #Con esto le decimos a Django que vamos a recibir archivos y datos de formulario, no un JSON puro.
@@ -55,3 +56,31 @@ class StudentsView(generics.CreateAPIView):
         )
 
         return Response({"profile_created_id": student.id, "message": "Alumno registrado exitosamente"}, status=status.HTTP_201_CREATED)
+
+
+    def get(self, request):
+        search_email = request.query_params.get('email', None)
+
+        if search_email:
+            # Lógica: Buscar un alumno específico por correo
+            try:
+                student = Student.objects.select_related('user').get(user__email=search_email)
+                data = {
+                    "id": student.id,
+                    "name": student.user.first_name + " " + student.user.last_name,
+                    "email": student.user.email
+                }
+                return Response(data, status=status.HTTP_200_OK)
+            except Student.DoesNotExist:
+                return Response(
+                    {"error": f"No se encontró ningún alumno con el correo: {search_email}"},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+        else:
+            # Lógica: ¿Qué pasa si hacen un GET sin el '?email='?
+            # Aquí podrías devolver una lista de todos los alumnos, 
+            # o simplemente devolver un error diciendo que se requiere el email.
+            return Response(
+                {"error": "Debes proporcionar un parámetro '?email=' para buscar."},
+                status=status.HTTP_400_BAD_REQUEST
+            )

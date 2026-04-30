@@ -92,8 +92,8 @@ class SubjectViewSet(viewsets.ModelViewSet):
             # Verificamos si ya está inscrito
             if subject.students.filter(id=student.id).exists():
                 return Response(
-                    {"message": "Este alumno ya está inscrito en la materia."}, 
-                    status=status.HTTP_200_OK
+                    {"error": "Este alumno ya está inscrito en la materia."}, 
+                    status=status.HTTP_400_BAD_REQUEST
                 )
                 
             # Lo agregamos
@@ -125,8 +125,7 @@ class SubjectViewSet(viewsets.ModelViewSet):
         #3. si no hay alumnos lanzamos ese mensaje
         if not enrollments.exists():
             return Response(
-                {"message": "Esta materia aun no tiene alumnos inscriptos"},
-                status=status.HTTP_200_OK
+                ([])
             )
 
         # 4. Si hay alumnos mandamos la lista 
