@@ -2,6 +2,7 @@ from django.contrib.auth.models import User
 from django.db import transaction
 from rest_framework import serializers
 from .models import Teacher, Student, Administrator, Subject, Exam, Question, AnswerOption, SubjectEnrollment
+from django.utils import timezone
 
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
@@ -355,3 +356,46 @@ class EnrolledStudentSerializer(serializers.ModelSerializer):
         # 🌟 2. Cambiamos Student por SubjectEnrollment
         model = SubjectEnrollment
         fields = ['id', 'name', 'email', 'date_enrolled']
+
+
+class StudentPendingExamSerializer(serializers.ModelSerializer): 
+    # usamos 'source' para renombrarlos al momento de enviar la respuesta.
+    dueDate = serializers.DateTimeField(source='end_date', format="%Y-%m-%dT%H:%M:%S", read_only=True) 
+    duration = serializers.IntegerField(source='duration_minutes', read_only=True) 
+    maxAttempts = serializers.IntegerField(source='max_attempts', read_only=True) 
+
+    # 2. Campos calculados (No vienen directo de una columna, los calculamos aquí)
+    questions = serializers.SerializerMethodField()
+    attempts = serializers.SerializerMethodField()
+    status = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Exam
+
+        fields = ['id', 'title', 'dueDate', 'duration', 'questions', 'attempts', 'maxAttempts', 'status']
+
+    # --- Funciones para los campos calculados ---
+
+    def get_questions(self, obj):
+        # Cuenta cuántas preguntas están vinculadas a este examen.
+        return obj.questions.count() 
+
+    def get_attempts(self, obj):
+        # Para saber los intentos, necesitamos saber QUIÉN está preguntando.
+        request = self.context.get('request')
+        if request and hasattr(request.user, 'student_profile'):
+            student = request.user.student_profile
+            # Por implementar el numero de intentos del alumno en esta materia
+            return 0 
+        return 0
+
+    def get_status(self, obj):
+        # Lógica para determinar el estado visual en Angular
+        now = timezone.now()
+
+        if obj.end_date and now > obj.end_date:
+            return 'overdue'
+            
+        # Por implementar la logica para 'in-progress' si el alumno ya empezó un intento pero no lo terminó
+        
+        return 'available'

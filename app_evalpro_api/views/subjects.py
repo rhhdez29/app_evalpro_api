@@ -2,8 +2,8 @@
 from rest_framework import viewsets, status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework import generics, permissions
-from app_evalpro_api.models import Subject, SubjectEnrollment, Student
-from app_evalpro_api.serializers import SubjectListSerializer, SubjectDetailSerializer, EnrolledStudentSerializer
+from app_evalpro_api.models import Subject, SubjectEnrollment, Student, Exam
+from app_evalpro_api.serializers import SubjectListSerializer, SubjectDetailSerializer, EnrolledStudentSerializer, ExamDetailSerializer, ExamListSerializer, StudentPendingExamSerializer
 from rest_framework.response import Response
 from rest_framework.decorators import action
 
@@ -132,3 +132,47 @@ class SubjectViewSet(viewsets.ModelViewSet):
         serializer = EnrolledStudentSerializer(enrollments, many=True)
         
         return Response(serializer.data)
+
+    @action(detail=True, methods=['get'])
+    def student_exams(self, request, pk=None):
+        # 1. Obtenemos la materia de la URL
+        subject = self.get_object()
+        user = request.user
+
+        # 2. Verificamos que el usuario logueado sea un alumno
+        if not hasattr(user, 'student_profile'):
+            return Response(
+                {"error": "Solo los alumnos pueden acceder a esta sección."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        student = request.user.student_profile
+
+        # 3. SEGURIDAD: Verificamos que el alumno esté inscrito en esta materia
+        is_enrolled = SubjectEnrollment.objects.filter(
+            subject=subject, 
+            student=student
+        ).exists()
+
+        if not is_enrolled:
+            return Response(
+                {"error": "No tienes permiso para ver los exámenes de esta materia porque no estás inscrito."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        # 4. Obtenemos solo los exámenes publicados
+        exams = Exam.objects.filter(
+            subject=subject,
+            status='draft' #Muestra solo los exámenes que esten en estado draft. Por implementar el cambio de estado en angular
+        )
+
+        # 5. Verificamos si hay exámenes
+        if not exams.exists():
+            return Response(
+                {"message": "Aún no hay exámenes disponibles para esta materia."},
+                status=status.HTTP_200_OK
+            )
+
+        # 6. Serializamos y devolvemos la lista
+        serializer = StudentPendingExamSerializer(exams, many=True, context={'request': request})
+        return Response(serializer.data, status=status.HTTP_200_OK)
