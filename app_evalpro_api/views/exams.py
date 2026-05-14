@@ -1,8 +1,12 @@
 from rest_framework import viewsets, status
 from rest_framework.permissions import IsAuthenticated
 from app_evalpro_api.models import Exam, Question, AnswerOption
-from app_evalpro_api.serializers import (ExamDetailSerializer, ExamListSerializer, QuestionSerializer, AswerQuestionSerializer)
+from app_evalpro_api.serializers import (ExamDetailSerializer, ExamListSerializer, QuestionSerializer, AswerQuestionSerializer, StudentExamDetailSerializer)
 from rest_framework.response import Response
+from rest_framework.decorators import action
+from app_evalpro_api.models import Student, SubjectEnrollment
+from django.shortcuts import get_object_or_404
+
 
 
 class ExamViewSet(viewsets.ModelViewSet):
@@ -46,6 +50,40 @@ class ExamViewSet(viewsets.ModelViewSet):
         exam.delete()
         
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @action(detail=True, methods=['get'])
+    def take_exam(self, request, pk=None):
+        # 1. Obtenemos el examen solicitado
+        exam = get_object_or_404(Exam, pk=pk)
+        
+        # 2. Obtenemos al estudiante
+        try:
+            student = Student.objects.get(user=request.user)
+        except Student.DoesNotExist:
+            return Response(
+                {"error": "Solo los alumnos registrados pueden tomar exámenes."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        # 3. SEGURIDAD VITAL: ¿El alumno está en la materia de este examen?
+        is_enrolled = SubjectEnrollment.objects.filter(
+            subject=exam.subject, 
+            student=student
+        ).exists()
+
+        if not is_enrolled:
+            return Response(
+                {"error": "No estás inscrito en la materia de este examen."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        # 4. Validar el estado del examen (¿Ya venció? ¿Está publicado?)
+        # if exam.status != 'publicado': ... 
+        
+        # 5. Serializar con el blindaje de seguridad
+        serializer = StudentExamDetailSerializer(exam)
+        
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 class QuestionViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]

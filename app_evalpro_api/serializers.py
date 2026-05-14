@@ -399,3 +399,29 @@ class StudentPendingExamSerializer(serializers.ModelSerializer):
         # Por implementar la logica para 'in-progress' si el alumno ya empezó un intento pero no lo terminó
         
         return 'available'
+
+# 🛡️ 1. Opciones (NIVEL MÁS ALTO DE SEGURIDAD)
+class StudentOptionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = AnswerOption
+        # ⚠️ ESTRICTAMENTE PROHIBIDO INCLUIR 'is_correct' o campos similares aquí
+        fields = ['id','question','text'] 
+
+# 🛡️ 2. Preguntas
+class StudentQuestionSerializer(serializers.ModelSerializer):
+    # Anidamos las opciones seguras
+    options = StudentOptionSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Question
+        # Mandamos el texto y valor, pero nada de justificaciones o configuraciones del maestro
+        fields = ['id', 'prompt', 'question_type', 'points', 'metadata', 'options']
+
+# 🛡️ 3. Examen (El cascarón principal)
+class StudentExamDetailSerializer(serializers.ModelSerializer):
+    # Anidamos las preguntas seguras
+    questions = StudentQuestionSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Exam
+        fields = ['id', 'title', 'description', 'start_date', 'end_date', 'total_score', 'duration_minutes', 'questions']
