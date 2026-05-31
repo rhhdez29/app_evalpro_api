@@ -253,6 +253,8 @@ class ExamDetailSerializer(serializers.ModelSerializer):
 class ExamListSerializer(serializers.ModelSerializer):
     questions_count = serializers.SerializerMethodField()
 
+    status = serializers.CharField(source='current_status', read_only=True)
+
     class Meta:
         model = Exam
         fields = [

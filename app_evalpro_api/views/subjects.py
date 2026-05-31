@@ -7,6 +7,9 @@ from app_evalpro_api.serializers import SubjectListSerializer, SubjectDetailSeri
 from rest_framework.response import Response
 from rest_framework.decorators import action
 
+from django.utils import timezone
+
+
 class SubjectViewSet(viewsets.ModelViewSet):
 
     # Protegemos la ruta para que solo usuarios logueados la vean
@@ -138,6 +141,7 @@ class SubjectViewSet(viewsets.ModelViewSet):
         # 1. Obtenemos la materia de la URL
         subject = self.get_object()
         user = request.user
+        now = timezone.now()
 
         # 2. Verificamos que el usuario logueado sea un alumno
         if not hasattr(user, 'student_profile'):
@@ -163,7 +167,8 @@ class SubjectViewSet(viewsets.ModelViewSet):
         # 4. Obtenemos solo los exámenes publicados
         exams = Exam.objects.filter(
             subject=subject,
-            status='draft' #Muestra solo los exámenes que esten en estado draft. Por implementar el cambio de estado en angular
+            status='scheduled',  # Solo publicados
+            start_date__lte=now, # Fecha inicio menor o igual a la actual
         )
 
         # 5. Verificamos si hay exámenes

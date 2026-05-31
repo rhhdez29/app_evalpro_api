@@ -1,6 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import User
 from rest_framework.authentication import TokenAuthentication
+from django.utils import timezone
 
 class BearerTokenAuthentication(TokenAuthentication):
     keyword = "Bearer"
@@ -121,7 +122,29 @@ class Exam(models.Model):
 
     def __str__(self):
         return f"{self.title}-{self.subject.name}"
-    
+
+    @property
+    def current_status(self):
+        # Si el maestro lo tiene en borrador, siempre es borrador
+        if self.status == 'draft':
+            return 'draft'
+            
+        # Si está programado, dejamos que el tiempo decida
+        if self.status == 'scheduled':
+            now = timezone.now()
+            
+            # Si ya pasó la fecha de inicio y no ha pasado la de fin
+            if self.start_date <= now <= self.end_date:
+                return 'published'
+                
+            # Si ya pasó la fecha de fin
+            elif now > self.end_date:
+                return 'closed'
+                
+            # Si aún no llega la fecha de inicio
+            return 'scheduled'
+            
+        return self.status    
 class Question(models.Model):
     #Tipos de preguntas
     QUESTION_TYPES =(

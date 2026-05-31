@@ -41,7 +41,7 @@ class ExamViewSet(viewsets.ModelViewSet):
 
     def destroy(self, request, *args, **kwargs):
         exam = self.get_object()
-        
+
         if exam.created_by != request.user:
             return Response(
                 {"error": "No tienes permiso para eliminar este examen."},
@@ -84,6 +84,57 @@ class ExamViewSet(viewsets.ModelViewSet):
         serializer = StudentExamDetailSerializer(exam)
         
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+    
+
+    @action(detail=True, methods=['patch'])
+    def change_status(self, request, pk=None):
+        # 1. Obtenemos el examen
+        exam = self.get_object()
+
+        # 2. SEGURIDAD: Verificar que quien intenta cambiar el estado sea el creador
+        # (O ajusta esta validación a la regla de negocio que definimos antes)
+        if exam.created_by != request.user:
+            return Response(
+                {"error": "No tienes permiso para modificar el estado de este examen."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        # 3. Leer el nuevo estado desde el cuerpo (body) de la petición
+        new_status = request.data.get('status')
+
+        if not new_status:
+            return Response(
+                {"error": "Debes proporcionar el campo 'status'."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        new_status = new_status.lower()
+        
+        # 4. Validar que el estado sea correcto
+        # ⚠️ IMPORTANTE: Ajusta esta lista para que coincida exactamente con las opciones 
+        # que pusiste en el 'choices' de tu modelo Exam.
+        allowed_statuses = ['draft', 'scheduled', 'published', 'closed'] 
+        
+        if new_status not in allowed_statuses:
+            return Response(
+                {"error": f"Estado inválido. Opciones permitidas: {allowed_statuses}"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # 5. Actualizar y guardar en la base de datos
+        exam.status = new_status
+        exam.save()
+
+        # 6. Devolver una respuesta de éxito para Angular
+        return Response(
+            {
+                "message": "Estado actualizado correctamente",
+                "status": exam.status
+            },
+            status=status.HTTP_200_OK
+        )
 
 class QuestionViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
