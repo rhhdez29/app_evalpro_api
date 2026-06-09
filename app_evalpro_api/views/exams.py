@@ -78,15 +78,16 @@ class ExamViewSet(viewsets.ModelViewSet):
             )
 
         # 4. Validar el estado del examen (¿Ya venció? ¿Está publicado?)
-        # if exam.status != 'publicado': ... 
+        # if exam.status == 'draft' or exam.status == 'scheduled':
+        #     return Response(
+        #         {"error": "Este examen no se encuentra disponible para ser realizado."},
+        #         status=status.HTTP_403_FORBIDDEN
+        #     )
         
         # 5. Serializar con el blindaje de seguridad
         serializer = StudentExamDetailSerializer(exam)
         
         return Response(serializer.data, status=status.HTTP_200_OK)
-
-
-    
 
     @action(detail=True, methods=['patch'])
     def change_status(self, request, pk=None):
@@ -94,7 +95,6 @@ class ExamViewSet(viewsets.ModelViewSet):
         exam = self.get_object()
 
         # 2. SEGURIDAD: Verificar que quien intenta cambiar el estado sea el creador
-        # (O ajusta esta validación a la regla de negocio que definimos antes)
         if exam.created_by != request.user:
             return Response(
                 {"error": "No tienes permiso para modificar el estado de este examen."},
@@ -113,9 +113,7 @@ class ExamViewSet(viewsets.ModelViewSet):
         new_status = new_status.lower()
         
         # 4. Validar que el estado sea correcto
-        # ⚠️ IMPORTANTE: Ajusta esta lista para que coincida exactamente con las opciones 
-        # que pusiste en el 'choices' de tu modelo Exam.
-        allowed_statuses = ['draft', 'scheduled', 'published', 'closed'] 
+        allowed_statuses = ['draft', 'scheduled'] 
         
         if new_status not in allowed_statuses:
             return Response(

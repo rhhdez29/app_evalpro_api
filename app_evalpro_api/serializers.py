@@ -4,11 +4,13 @@ from rest_framework import serializers
 from .models import Teacher, Student, Administrator, Subject, Exam, Question, AnswerOption, SubjectEnrollment
 from django.utils import timezone
 
+#Serializador para obtener los datos completos de un usuario
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ("id", "first_name", "last_name", "email")
 
+#Serializador para obtener los datos completos de un administrador
 class AdministratorSerializer(serializers.ModelSerializer):
     user = UserSerializer(read_only=True)
     class Meta:
@@ -16,6 +18,7 @@ class AdministratorSerializer(serializers.ModelSerializer):
         fields = ('id', 'user', 'id_admin', 'department', 'creation', 'update')
         read_only_fields = ('id', 'creation', 'update')
 
+#Serializador para obtener los datos completos de un maestro
 class TeacherSerializer(serializers.ModelSerializer):
     user = UserSerializer(read_only=True)
     class Meta:
@@ -23,6 +26,7 @@ class TeacherSerializer(serializers.ModelSerializer):
         fields = ('id', 'user', 'id_teacher', 'faculty', 'creation', 'update')
         read_only_fields = ('id', 'creation', 'update')
 
+#Serializador para obtener los datos completos de un alumno
 class StudentSerializer(serializers.ModelSerializer):
     user = UserSerializer(read_only=True)
     class Meta:
@@ -30,6 +34,7 @@ class StudentSerializer(serializers.ModelSerializer):
         fields = ('id', 'user', 'id_student', 'career', 'semester', 'kardex', 'creation', 'update')
         read_only_fields = ('id', 'creation', 'update')
 
+#Serializador para obtener todas las materias que tiene un maestro 
 class SubjectListSerializer(serializers.ModelSerializer):
     # Campos calculados al vuelo (Solo lectura)
     teacher_name = serializers.SerializerMethodField()
@@ -69,6 +74,7 @@ class SubjectListSerializer(serializers.ModelSerializer):
         
         return 0
     
+#Serializador para obtener los detalles de una materia
 class SubjectDetailSerializer(serializers.ModelSerializer):
     # Calculamos los datos extra que tu Angular está esperando
     teacher_name = serializers.SerializerMethodField()
@@ -112,6 +118,7 @@ class SubjectDetailSerializer(serializers.ModelSerializer):
         return 0
     
 
+#Serializador para obtener las opciones de respuesta de un examen
 class AswerQuestionSerializer(serializers.ModelSerializer):
 
     id = serializers.IntegerField(required=False, allow_null=True)
@@ -126,6 +133,7 @@ class AswerQuestionSerializer(serializers.ModelSerializer):
             'partial_points'
         ]
 
+#Serializador para obtener las preguntas de un examen
 class QuestionSerializer(serializers.ModelSerializer):
 
     id = serializers.IntegerField(required=False, allow_null=True)
@@ -144,6 +152,7 @@ class QuestionSerializer(serializers.ModelSerializer):
             'options'
         ]
 
+#Serializador para obtener los detalles de un examen y poder editarlo o crearlo (maestro y admin)
 class ExamDetailSerializer(serializers.ModelSerializer):
     questions = QuestionSerializer(many=True, read_only=False)
 
@@ -250,6 +259,7 @@ class ExamDetailSerializer(serializers.ModelSerializer):
 
 
 
+#Serializador para listar los exámenes
 class ExamListSerializer(serializers.ModelSerializer):
     questions_count = serializers.SerializerMethodField()
 
@@ -274,6 +284,7 @@ class ExamListSerializer(serializers.ModelSerializer):
         
         return 0
     
+#Serializador para obtener todos los usuarios
 class UserListSerializer(serializers.ModelSerializer):
 
     complete_name = serializers.SerializerMethodField()
@@ -339,8 +350,9 @@ class PendingTeacherSerializer(serializers.ModelSerializer):
             return grupo.name
         return "Sin Rol"
 
+#Serializador para obtener los alumnos inscritos
 class EnrolledStudentSerializer(serializers.ModelSerializer):
-    # 🌟 1. Corregimos las rutas: Todo debe pasar por 'student' primero
+    #debe pasar por 'student' primero
     id = serializers.CharField(source='student.id', read_only=True)
     email = serializers.EmailField(source='student.user.email', read_only=True)
 
@@ -355,61 +367,52 @@ class EnrolledStudentSerializer(serializers.ModelSerializer):
     )
 
     class Meta:
-        # 🌟 2. Cambiamos Student por SubjectEnrollment
         model = SubjectEnrollment
         fields = ['id', 'name', 'email', 'date_enrolled']
 
 
+#Serializador para obtener los exámenes pendientes de un alumno
 class StudentPendingExamSerializer(serializers.ModelSerializer): 
     # usamos 'source' para renombrarlos al momento de enviar la respuesta.
     dueDate = serializers.DateTimeField(source='end_date', format="%Y-%m-%dT%H:%M:%S", read_only=True) 
     duration = serializers.IntegerField(source='duration_minutes', read_only=True) 
-    maxAttempts = serializers.IntegerField(source='max_attempts', read_only=True) 
 
-    # 2. Campos calculados (No vienen directo de una columna, los calculamos aquí)
     questions = serializers.SerializerMethodField()
-    attempts = serializers.SerializerMethodField()
+
     status = serializers.SerializerMethodField()
 
     class Meta:
         model = Exam
 
-        fields = ['id', 'title', 'dueDate', 'duration', 'questions', 'attempts', 'maxAttempts', 'status']
+        fields = ['id', 'title', 'dueDate', 'description', 'duration', 'questions', 'status']
 
     # --- Funciones para los campos calculados ---
 
     def get_questions(self, obj):
         # Cuenta cuántas preguntas están vinculadas a este examen.
-        return obj.questions.count() 
-
-    def get_attempts(self, obj):
-        # Para saber los intentos, necesitamos saber QUIÉN está preguntando.
-        request = self.context.get('request')
-        if request and hasattr(request.user, 'student_profile'):
-            student = request.user.student_profile
-            # Por implementar el numero de intentos del alumno en esta materia
-            return 0 
-        return 0
+        return obj.questions.count()
 
     def get_status(self, obj):
-        # Lógica para determinar el estado visual en Angular
-        now = timezone.now()
+        status = obj.current_status
 
-        if obj.end_date and now > obj.end_date:
-            return 'overdue'
-            
-        # Por implementar la logica para 'in-progress' si el alumno ya empezó un intento pero no lo terminó
+        print(status)
         
-        return 'available'
+        if status == 'published':
+            return 'available'
+        if status == 'closed':
+            return 'overdue'
+        
+        return status
+            
 
-# 🛡️ 1. Opciones (NIVEL MÁS ALTO DE SEGURIDAD)
+#Serializador de opciones de examen para alumnos 
 class StudentOptionSerializer(serializers.ModelSerializer):
     class Meta:
         model = AnswerOption
         # ⚠️ ESTRICTAMENTE PROHIBIDO INCLUIR 'is_correct' o campos similares aquí
         fields = ['id','question','text'] 
 
-# 🛡️ 2. Preguntas
+#Serializador de preguntas para alumnos 
 class StudentQuestionSerializer(serializers.ModelSerializer):
     # Anidamos las opciones seguras
     options = StudentOptionSerializer(many=True, read_only=True)
@@ -419,11 +422,13 @@ class StudentQuestionSerializer(serializers.ModelSerializer):
         # Mandamos el texto y valor, pero nada de justificaciones o configuraciones del maestro
         fields = ['id', 'prompt', 'question_type', 'points', 'metadata', 'options']
 
-# 🛡️ 3. Examen (El cascarón principal)
+#Serializador de examen para alumnos 
 class StudentExamDetailSerializer(serializers.ModelSerializer):
     # Anidamos las preguntas seguras
     questions = StudentQuestionSerializer(many=True, read_only=True)
 
+    status = serializers.CharField() 
+
     class Meta:
         model = Exam
-        fields = ['id', 'title', 'description', 'start_date', 'end_date', 'total_score', 'duration_minutes', 'questions']
+        fields = ['id', 'title', 'description', 'start_date', 'end_date', 'total_score', 'duration_minutes', 'questions','status']
