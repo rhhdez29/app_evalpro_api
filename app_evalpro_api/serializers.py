@@ -393,11 +393,22 @@ class StudentPendingExamSerializer(serializers.ModelSerializer):
         return obj.questions.count()
 
     def get_status(self, obj):
-        status = obj.current_status
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            try:
+                from .models import Student, ExamAttempt
+                student = Student.objects.get(user=request.user)
+                attempt = ExamAttempt.objects.filter(exam=obj, student=student).first()
+                if attempt:
+                    if attempt.status == ExamAttempt.AttemptStatus.ANNULLED_BY_FRAUD:
+                        return 'annulled'
+                    return attempt.status
+            except Student.DoesNotExist:
+                pass
 
+        status = obj.current_status
         if status == 'published':
             return 'available'
-        #implementar si el examen ya empezo
         if status == 'closed':
             return 'overdue'
         

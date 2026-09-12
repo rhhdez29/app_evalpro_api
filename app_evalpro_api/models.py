@@ -195,27 +195,36 @@ class SubjectEnrollment(models.Model):
 
 # El intento del examen 
 class ExamAttempt(models.Model):
+    class AttemptStatus(models.TextChoices):
+        IN_PROGRESS = 'in_progress', 'En progreso'
+        COMPLETED = 'completed', 'Completado'
+        ANNULLED_BY_FRAUD = 'annulled_by_fraud', 'Anulado por fraude'
+        NEEDS_GRADING = 'needs_grading', 'Pendiente de calificación'
+
     # Relaciones principales
     student = models.ForeignKey('Student', on_delete=models.CASCADE, related_name='exam_attempts')
     exam = models.ForeignKey('Exam', on_delete=models.CASCADE, related_name='attempts')
     
     # Tiempos
     start_time = models.DateTimeField(auto_now_add=True)
-    end_time = models.DateTimeField(auto_now=True) 
+    end_time = models.DateTimeField(null=True, blank=True)
     
     # Estados de calificación
     status = models.CharField(
         max_length=20, 
-        choices=[
-            ('in_progress', 'En progreso'), 
-            ('needs_grading', 'Pendiente de calificación'), 
-            ('completed', 'Completado')
-        ],
-        default='in_progress'
+        choices=AttemptStatus.choices,
+        default=AttemptStatus.IN_PROGRESS
     )
     
     # Calificación total (Se llena al terminar o al calificar manualmente)
     score = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+    
+    # Motivo de anulación
+    cancellation_reason = models.TextField(
+        null=True, 
+        blank=True, 
+        help_text='Motivo exacto de la anulación (ej. "Pérdida de foco de ventana")'
+    )
 
     class Meta:
         # Esto es lo que bloquea que el alumno mande el examen dos veces

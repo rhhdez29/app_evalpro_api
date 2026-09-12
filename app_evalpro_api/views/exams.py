@@ -81,10 +81,10 @@ class ExamViewSet(viewsets.ModelViewSet):
         attempt = ExamAttempt.objects.filter(exam=exam, student=student).first()
         
         if attempt:
-            # Si el examen ya está terminado o calificado, le bloqueamos el acceso
-            if attempt.status in ['completed', 'needs_grading']:
+            # Si el examen ya está terminado, calificado o anulado, le bloqueamos el acceso
+            if attempt.status in ['completed', 'needs_grading', 'annulled_by_fraud']:
                 return Response(
-                    {"error": "Ya completaste este examen. Ve a la sección de resultados para revisarlo."},
+                    {"error": "Este examen ya fue completado o anulado. No puedes volver a ingresar."},
                     status=status.HTTP_403_FORBIDDEN
                 )
             # Si está 'in_progress', no hacemos nada (solo recargó la página)
@@ -293,6 +293,37 @@ class ExamViewSet(viewsets.ModelViewSet):
         except ExamAttempt.DoesNotExist:
             return Response(
                 {"message": "No tenías ningún intento guardado para este examen."}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+    @action(detail=True, methods=['post'])
+    def void(self, request, pk=None):
+        from django.shortcuts import get_object_or_404
+        from app_evalpro_api.models import Exam, ExamAttempt, Student
+        
+        exam = get_object_or_404(Exam, pk=pk)
+        
+        try:
+            student = Student.objects.get(user=request.user)
+        except Student.DoesNotExist:
+            return Response(
+                {"error": "Solo los alumnos pueden tener intentos."}, 
+                status=status.HTTP_403_FORBIDDEN
+            )
+            
+        try:
+            attempt = ExamAttempt.objects.get(exam=exam, student=student)
+            attempt.status = ExamAttempt.AttemptStatus.ANNULLED_BY_FRAUD
+            attempt.cancellation_reason = request.data.get('reason', 'Fraude detectado: pérdida de foco')
+            attempt.save()
+            
+            return Response(
+                {"message": "Intento de examen anulado."}, 
+                status=status.HTTP_200_OK
+            )
+        except ExamAttempt.DoesNotExist:
+            return Response(
+                {"error": "No se encontró un intento para este examen."}, 
                 status=status.HTTP_404_NOT_FOUND
             )
 
