@@ -1,7 +1,7 @@
 from django.contrib.auth.models import User
 from django.db import transaction
 from rest_framework import serializers
-from .models import Teacher, Student, Administrator, Subject, Exam, Question, AnswerOption, SubjectEnrollment
+from .models import Teacher, Student, Administrator, Subject, Exam, Question, AnswerOption, SubjectEnrollment, StudentAnswer, ExamAttempt
 from django.utils import timezone
 
 #Serializador para obtener los datos completos de un usuario
@@ -395,10 +395,9 @@ class StudentPendingExamSerializer(serializers.ModelSerializer):
     def get_status(self, obj):
         status = obj.current_status
 
-        print(status)
-        
         if status == 'published':
             return 'available'
+        #implementar si el examen ya empezo
         if status == 'closed':
             return 'overdue'
         
@@ -409,7 +408,6 @@ class StudentPendingExamSerializer(serializers.ModelSerializer):
 class StudentOptionSerializer(serializers.ModelSerializer):
     class Meta:
         model = AnswerOption
-        # ⚠️ ESTRICTAMENTE PROHIBIDO INCLUIR 'is_correct' o campos similares aquí
         fields = ['id','question','text'] 
 
 #Serializador de preguntas para alumnos 
@@ -432,3 +430,47 @@ class StudentExamDetailSerializer(serializers.ModelSerializer):
     class Meta:
         model = Exam
         fields = ['id', 'title', 'description', 'start_date', 'end_date', 'total_score', 'duration_minutes', 'questions','status']
+
+
+#Serializador para cada respuesta individual
+class SubmitAnswerSerializer(serializers.Serializer):
+    question_id = serializers.IntegerField()
+    selected_option_id = serializers.IntegerField(allow_null=True, required=False)
+    text_response = serializers.CharField(allow_null=True, required=False, allow_blank=True)
+
+#Serializador que agrupa el arreglo completo
+class SubmitExamSerializer(serializers.Serializer):
+    answers = SubmitAnswerSerializer(many=True)
+
+#Serializador para cada respuesta individual de la revisión
+class ReviewAnswerSerializer(serializers.ModelSerializer):
+    # Traemos información útil de la pregunta original para poder mostrarla en la vista de revisión
+    question_prompt = serializers.CharField(source='question.prompt', read_only=True)
+    question_type = serializers.CharField(source='question.question_type', read_only=True)
+    
+    # Traemos el texto de la opción seleccionada si es que fue de opción múltiple
+    selected_option_text = serializers.CharField(source='selected_option.text', read_only=True, default=None)
+
+    class Meta:
+        model = StudentAnswer
+        fields = [
+            'question_id', 
+            'question_prompt', 
+            'question_type',
+            'selected_option_id', 
+            'selected_option_text', 
+            'text_response', 
+            'is_correct', 
+            'points_earned', 
+            'needs_manual_review'
+        ]
+
+#Serializador principal de la hoja de resultados
+class ExamAttemptReviewSerializer(serializers.ModelSerializer):
+    exam_title = serializers.CharField(source='exam.title', read_only=True)
+    # Anidamos las respuestas
+    answers = ReviewAnswerSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = ExamAttempt
+        fields = ['id', 'exam_title', 'start_time', 'end_time', 'status', 'score', 'answers']

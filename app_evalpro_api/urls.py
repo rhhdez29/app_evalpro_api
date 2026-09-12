@@ -22,9 +22,20 @@ router.register(r'questions', QuestionViewSet, basename='question')
 router.register(r'options', AnswerOptionViewSet, basename='option')
 router.register(r'users', UserListViewSet, basename='user')
 
-# {{http}}://{{host}}/exams/?subject=4 obtener los examenes de una materia
-# {{http}}://{{host}}/exams/10/ obtener un examen por id
-# {{http}}://{{host}}/exams/ obtener todos los examenes
+# para obtener los examenes de una materia
+# {{http}}://{{host}}/exams/?subject=4
+# para obtener un examen por id
+# {{http}}://{{host}}/exams/10/
+# para obtener todos los examenes
+# {{http}}://{{host}}/exams/
+# para tomar un examen
+# {{http}}://{{host}}/exams/24/take_exam/ 
+# para enviar el examen
+# {{http}}://{{host}}/exams/24/submit/ 
+# para ver el resultado del examen
+# {{http}}://{{host}}/exams/24/my_result/ 
+# para eliminar la respuesta del estudiante
+# {{http}}://{{host}}/exams/24/reset_attempt/ 
 
 urlpatterns = [
     

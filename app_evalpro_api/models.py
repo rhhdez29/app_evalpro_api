@@ -192,3 +192,134 @@ class SubjectEnrollment(models.Model):
     class Meta:
         unique_together = ('subject', 'student')
         ordering = ['-date_enrolled']
+
+# El intento del examen 
+class ExamAttempt(models.Model):
+    # Relaciones principales
+    student = models.ForeignKey('Student', on_delete=models.CASCADE, related_name='exam_attempts')
+    exam = models.ForeignKey('Exam', on_delete=models.CASCADE, related_name='attempts')
+    
+    # Tiempos
+    start_time = models.DateTimeField(auto_now_add=True)
+    end_time = models.DateTimeField(auto_now=True) 
+    
+    # Estados de calificación
+    status = models.CharField(
+        max_length=20, 
+        choices=[
+            ('in_progress', 'En progreso'), 
+            ('needs_grading', 'Pendiente de calificación'), 
+            ('completed', 'Completado')
+        ],
+        default='in_progress'
+    )
+    
+    # Calificación total (Se llena al terminar o al calificar manualmente)
+    score = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+
+    class Meta:
+        # Esto es lo que bloquea que el alumno mande el examen dos veces
+        unique_together = ('student', 'exam') 
+
+    def __str__(self):
+        return f"Intento de {self.student.user.first_name} en {self.exam.title}"
+
+
+# LA RESPUESTA INDIVIDUAL
+class StudentAnswer(models.Model):
+    # Pertenece a un intento específico, no al examen directo
+    attempt = models.ForeignKey(ExamAttempt, on_delete=models.CASCADE, related_name='answers')
+    question = models.ForeignKey('Question', on_delete=models.CASCADE)
+    
+    # Los dos tipos de respuestas posibles (una o la otra)
+    selected_option = models.ForeignKey('AnswerOption', on_delete=models.SET_NULL, null=True, blank=True)
+    text_response = models.TextField(null=True, blank=True)
+    
+    # Datos de evaluación por pregunta
+    is_correct = models.BooleanField(null=True, blank=True) # Null significa "No calificada aún"
+    points_earned = models.DecimalField(max_digits=5, decimal_places=2, default=0.00)
+    
+    # Bandera de alerta para el maestro
+    needs_manual_review = models.BooleanField(default=False)
+
+    class Meta:
+        # Un alumno no puede contestar la misma pregunta dos veces en el mismo intento
+        unique_together = ('attempt', 'question')
+
+    def save(self, *args, **kwargs):
+        # 🛡️ Lógica de Autocalificación
+        if self.is_correct is None:
+            tipo_pregunta = self.question.question_type 
+            
+            # 1. TIPO: OPCIÓN MÚLTIPLE (MCQ)
+            if tipo_pregunta == 'MCQ':
+                # Validamos si seleccionó una opción y si esa opción en la BD tiene is_correct=True
+                if self.selected_option and getattr(self.selected_option, 'is_correct', False):
+                    self.is_correct = True
+                    self.points_earned = self.question.points
+                else:
+                    self.is_correct = False
+                    self.points_earned = 0.00
+                self.needs_manual_review = False
+                
+            # 2. TIPO: VERDADERO / FALSO (TF)
+            elif tipo_pregunta == 'TF':
+                # El alumno envía "true" o "false" en text_response.
+                # La BD tiene { correctAnswer: true } como booleano en el JSON.
+                respuesta_alumno = str(self.text_response).strip().lower()
+                respuesta_correcta = str(self.question.metadata.get('correctAnswer', '')).strip().lower()
+                
+                if respuesta_alumno == respuesta_correcta:
+                    self.is_correct = True
+                    self.points_earned = self.question.points
+                else:
+                    self.is_correct = False
+                    self.points_earned = 0.00
+                self.needs_manual_review = False
+
+            # 3. TIPO: RELACIONAR (MATCH)
+            elif tipo_pregunta == 'MATCH':
+                import json
+                try:
+                    # Parseamos lo que envía el alumno desde Angular
+                    respuesta_alumno = json.loads(self.text_response)
+                    
+                    # Obtenemos el arreglo original de pares: [{left: "int", right: "..."}, ...]
+                    pares_correctos = self.question.metadata.get('pairs', [])
+                    
+                    # Convertimos los pares originales a un diccionario para fácil comparación
+                    # Ej: {"int": "Número entero", "str": "Texto..."}
+                    dict_correcto = {str(item.get('left')).strip(): str(item.get('right')).strip() for item in pares_correctos}
+                    
+                    # Flexibilidad: soportar si Angular manda un array de objetos o un diccionario directo
+                    if isinstance(respuesta_alumno, list):
+                        dict_alumno = {str(item.get('left')).strip(): str(item.get('right')).strip() for item in respuesta_alumno}
+                    else:
+                        dict_alumno = {str(k).strip(): str(v).strip() for k, v in respuesta_alumno.items()}
+                    
+                    # La magia: Python compara que ambos diccionarios tengan exactamente las mismas llaves y valores, sin importar el orden
+                    if dict_alumno == dict_correcto:
+                        self.is_correct = True
+                        self.points_earned = self.question.points
+                    else:
+                        self.is_correct = False
+                        self.points_earned = 0.00
+                        
+                except (ValueError, TypeError, AttributeError):
+                    # Si mandó algo que no es JSON válido o hubo un error de formato
+                    self.is_correct = False
+                    self.points_earned = 0.00
+                    
+                self.needs_manual_review = False
+                
+            # 4. TIPO: CÓDIGO (CODE)
+            elif tipo_pregunta == 'CODE':
+                # Se va directo a calificación manual
+                self.is_correct = None 
+                self.points_earned = 0.00
+                self.needs_manual_review = True
+                
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"Respuesta a Pregunta {self.question.id} (Intento {self.attempt.id})"
