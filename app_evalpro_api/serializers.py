@@ -40,6 +40,7 @@ class SubjectListSerializer(serializers.ModelSerializer):
     teacher_name = serializers.SerializerMethodField()
     students_count = serializers.SerializerMethodField()
     exams_count = serializers.SerializerMethodField()
+    next_exam_date = serializers.SerializerMethodField()
 
     # Nota: exams_count lo agregaremos cuando creemos la tabla Exam
 
@@ -53,10 +54,11 @@ class SubjectListSerializer(serializers.ModelSerializer):
             'department', 
             'teacher_name', 
             'students_count', 
-            'exams_count'
+            'exams_count',
+            'next_exam_date'
         )
         # Protegemos los campos que no deben enviarse en el POST
-        read_only_fields = ('id', 'created_by', 'teacher_name', 'students_count')
+        read_only_fields = ('id', 'created_by', 'teacher_name', 'students_count', 'next_exam_date')
 
     def get_teacher_name(self, obj):
         # Une el nombre y apellido del creador
@@ -73,6 +75,31 @@ class SubjectListSerializer(serializers.ModelSerializer):
             return obj.exams.count()
         
         return 0
+        
+    def get_next_exam_date(self, obj):
+        request = self.context.get('request')
+        if not request or not request.user.is_authenticated:
+            return None
+            
+        try:
+            student = request.user.student_profile
+        except AttributeError:
+            return None
+            
+        now = timezone.now()
+        
+        upcoming_exam = obj.exams.filter(
+            status='scheduled',
+            end_date__gt=now
+        ).exclude(
+            attempts__student=student,
+            attempts__status__in=['completed', 'annulled_by_fraud', 'annulled']
+        ).order_by('end_date').first()
+        
+        if upcoming_exam:
+            return upcoming_exam.end_date
+            
+        return None
     
 #Serializador para obtener los detalles de una materia
 class SubjectDetailSerializer(serializers.ModelSerializer):

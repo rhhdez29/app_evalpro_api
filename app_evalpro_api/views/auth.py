@@ -2,7 +2,10 @@ from rest_framework import permissions, generics, status
 from rest_framework.authtoken.views import ObtainAuthToken
 from rest_framework.authtoken.models import Token
 from rest_framework.response import Response
-from app_evalpro_api.models import Teacher, Student, Administrator
+from app_evalpro_api.models import Teacher, Student, Administrator, Exam
+from django.utils import timezone
+from datetime import timedelta
+from django.db.models import Q
 
 class CustomAuthToken(ObtainAuthToken):
     def post(self, request, *args, **kwargs):
@@ -54,6 +57,23 @@ class CustomAuthToken(ObtainAuthToken):
                 response_data['semester'] = student.semester
                 # request.build_absolute_uri() crea la URL completa (ej. http://127.0.0.1:8000/media/...)
                 response_data['kardex'] = request.build_absolute_uri(student.kardex.url) if student.kardex else None
+                
+                # Calcular exámenes próximos (ventana de 48 horas o ya iniciados)
+                now = timezone.now()
+                two_days_later = now + timedelta(days=2)
+                upcoming_exams_count = Exam.objects.filter(
+                    subject__in=student.enrolled_subjects.all(),
+                    status='scheduled',
+                ).filter(
+                    Q(start_date__range=(now, two_days_later)) | 
+                    Q(end_date__range=(now, two_days_later)) |
+                    Q(start_date__lte=now, end_date__gte=now)
+                ).exclude(
+                    attempts__student=student,
+                    attempts__status__in=['completed', 'annulled_by_fraud', 'annulled']
+                ).count()
+                
+                response_data['upcoming_exams_count'] = upcoming_exams_count
 
             return Response(response_data)
             
