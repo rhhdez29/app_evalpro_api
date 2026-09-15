@@ -267,19 +267,31 @@ class ExamViewSet(viewsets.ModelViewSet):
     #Elimina la respuesta del estudiante
     @action(detail=True, methods=['delete'])
     def reset_attempt(self, request, pk=None):
-        # 1. Buscamos el examen saltando los filtros del ViewSet
         from django.shortcuts import get_object_or_404
         from app_evalpro_api.models import Exam, ExamAttempt, Student
         
         exam = get_object_or_404(Exam, pk=pk)
         
-        # 2. Obtenemos al estudiante actual
+        # Seguridad: Solo maestros o administradores
+        if not (request.user.groups.filter(name='maestro').exists() or request.user.groups.filter(name='administrador').exists()):
+            return Response(
+                {"error": "No tienes permiso para eliminar intentos de examen."}, 
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        student_id = request.query_params.get('student_id') or request.data.get('student_id')
+        if not student_id:
+            return Response(
+                {"error": "Debes proporcionar el ID del estudiante (student_id)."}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         try:
-            student = Student.objects.get(user=request.user)
+            student = Student.objects.get(id=student_id)
         except Student.DoesNotExist:
             return Response(
-                {"error": "Solo los alumnos pueden reiniciar sus intentos."}, 
-                status=status.HTTP_403_FORBIDDEN
+                {"error": "Estudiante no encontrado."}, 
+                status=status.HTTP_404_NOT_FOUND
             )
 
         # 3. Buscamos y destruimos el intento
@@ -287,14 +299,58 @@ class ExamViewSet(viewsets.ModelViewSet):
             attempt = ExamAttempt.objects.get(exam=exam, student=student)
             attempt.delete() # 🌟 Esta línea hace la magia y borra todo en cascada
             return Response(
-                {"message": "Intento eliminado con éxito. Puedes volver a tomar el examen."}, 
+                {"message": "Intento eliminado con éxito. El alumno puede volver a tomar el examen."}, 
                 status=status.HTTP_200_OK
             )
         except ExamAttempt.DoesNotExist:
             return Response(
-                {"message": "No tenías ningún intento guardado para este examen."}, 
+                {"message": "El estudiante no tenía ningún intento guardado para este examen."}, 
                 status=status.HTTP_404_NOT_FOUND
             )
+
+    @action(detail=True, methods=['get'])
+    def results(self, request, pk=None):
+        from django.shortcuts import get_object_or_404
+        from app_evalpro_api.models import Exam, ExamAttempt, SubjectEnrollment
+        
+        exam = get_object_or_404(Exam, pk=pk)
+        
+        # Seguridad
+        if not (request.user.groups.filter(name='maestro').exists() or request.user.groups.filter(name='administrador').exists()):
+            return Response(
+                {"error": "No tienes permiso para ver resultados de exámenes."}, 
+                status=status.HTTP_403_FORBIDDEN
+            )
+            
+        # Obtener todos los alumnos inscritos
+        enrollments = SubjectEnrollment.objects.filter(subject=exam.subject)
+        
+        # Obtener intentos
+        attempts = ExamAttempt.objects.filter(exam=exam)
+        attempts_map = {a.student_id: a for a in attempts}
+        
+        results_data = []
+        for enrollment in enrollments:
+            student = enrollment.student
+            attempt = attempts_map.get(student.id)
+            
+            status_str = 'not_started'
+            score = 0
+            if attempt:
+                if attempt.status == ExamAttempt.AttemptStatus.ANNULLED_BY_FRAUD:
+                    status_str = 'annulled_by_fraud'
+                else:
+                    status_str = attempt.status
+                score = attempt.score
+                
+            results_data.append({
+                "student_id": student.id,
+                "student_name": f"{student.user.first_name} {student.user.last_name}",
+                "status": status_str,
+                "score": score
+            })
+            
+        return Response(results_data, status=status.HTTP_200_OK)
 
     @action(detail=True, methods=['post'])
     def void(self, request, pk=None):
