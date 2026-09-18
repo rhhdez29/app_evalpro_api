@@ -165,11 +165,20 @@ class ExamViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_403_FORBIDDEN
             )
 
-        # 2. SEGURIDAD: Evitar envíos duplicados
-        if ExamAttempt.objects.filter(student=student, exam=exam).exists():
-            return Response(
-                {"error": "Ya has enviado tus respuestas para este examen anteriormente."}, 
-                status=status.HTTP_400_BAD_REQUEST
+        # 2. Manejo del Ciclo de Vida del Intento
+        attempt = ExamAttempt.objects.filter(student=student, exam=exam).first()
+        
+        if attempt:
+            if attempt.status in ['completed', 'needs_grading', 'annulled_by_fraud', 'annulled']:
+                return Response(
+                    {"error": "Ya has enviado o perdido tus respuestas para este examen."}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        else:
+            attempt = ExamAttempt.objects.create(
+                student=student, 
+                exam=exam, 
+                status='in_progress'
             )
 
         # 3. Validar que el JSON de Angular venga bien estructurado
@@ -180,13 +189,6 @@ class ExamViewSet(viewsets.ModelViewSet):
         # 4. 🛡️ Iniciar la Transacción Segura
         try:
             with transaction.atomic():
-                # A. Crear la "Hoja de respuestas" (El Intento)
-                attempt = ExamAttempt.objects.create(
-                    student=student, 
-                    exam=exam, 
-                    status='in_progress'
-                )
-
                 respuestas_data = serializer.validated_data['answers']
                 requiere_revision_manual = False
                 calificacion_temporal = 0.00
@@ -215,6 +217,8 @@ class ExamViewSet(viewsets.ModelViewSet):
                         calificacion_temporal += float(student_answer.points_earned)
 
                 # D. Finalizar el examen determinando su estado final
+                from django.utils import timezone
+                attempt.end_time = timezone.now()
                 attempt.score = calificacion_temporal
                 attempt.status = 'needs_grading' if requiere_revision_manual else 'completed'
                 attempt.save()
