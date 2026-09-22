@@ -2,8 +2,8 @@
 from rest_framework import viewsets, status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework import generics, permissions
-from app_evalpro_api.models import Subject, SubjectEnrollment, Student, Exam
-from app_evalpro_api.serializers import SubjectListSerializer, SubjectDetailSerializer, EnrolledStudentSerializer, ExamDetailSerializer, ExamListSerializer, StudentPendingExamSerializer
+from app_evalpro_api.models import Subject, SubjectEnrollment, Student, Exam, ExamAttempt
+from app_evalpro_api.serializers import SubjectListSerializer, SubjectDetailSerializer, EnrolledStudentSerializer, ExamDetailSerializer, ExamListSerializer, StudentPendingExamSerializer, StudentGradeSerializer
 from rest_framework.response import Response
 from rest_framework.decorators import action
 
@@ -171,6 +171,15 @@ class SubjectViewSet(viewsets.ModelViewSet):
             start_date__lte=now, # Fecha inicio menor o igual a la actual
         )
 
+        # 4.1 Excluir exámenes donde el alumno ya tiene un intento finalizado
+        finished_exam_ids = ExamAttempt.objects.filter(
+            student=student,
+            exam__subject=subject,
+            status__in=['completed', 'needs_grading', 'annulled_by_fraud']
+        ).values_list('exam_id', flat=True)
+
+        exams = exams.exclude(id__in=finished_exam_ids)
+
         # 5. Verificamos si hay exámenes
         if not exams.exists():
             return Response(
@@ -180,4 +189,37 @@ class SubjectViewSet(viewsets.ModelViewSet):
 
         # 6. Serializamos y devolvemos la lista
         serializer = StudentPendingExamSerializer(exams, many=True, context={'request': request})
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['get'])
+    def student_grades(self, request, pk=None):
+        subject = self.get_object()
+        user = request.user
+
+        if not hasattr(user, 'student_profile'):
+            return Response(
+                {"error": "Solo los alumnos pueden acceder a esta sección."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        student = request.user.student_profile
+
+        is_enrolled = SubjectEnrollment.objects.filter(
+            subject=subject,
+            student=student
+        ).exists()
+
+        if not is_enrolled:
+            return Response(
+                {"error": "No tienes permiso para ver las calificaciones de esta materia porque no estás inscrito."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        attempts = ExamAttempt.objects.filter(
+            student=student,
+            exam__subject=subject,
+            status__in=['completed', 'needs_grading', 'annulled_by_fraud']
+        ).select_related('exam').order_by('-end_time')
+
+        serializer = StudentGradeSerializer(attempts, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)

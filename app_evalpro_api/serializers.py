@@ -492,6 +492,7 @@ class ReviewAnswerSerializer(serializers.ModelSerializer):
     class Meta:
         model = StudentAnswer
         fields = [
+            'id',
             'question_id', 
             'question_prompt', 
             'question_type',
@@ -512,3 +513,18 @@ class ExamAttemptReviewSerializer(serializers.ModelSerializer):
     class Meta:
         model = ExamAttempt
         fields = ['id', 'exam_title', 'start_time', 'end_time', 'status', 'score', 'answers']
+
+# Serializador para las calificaciones del alumno (pestaña "Mis Calificaciones")
+class StudentGradeSerializer(serializers.ModelSerializer):
+    exam_title = serializers.CharField(source='exam.title', read_only=True)
+    exam_id = serializers.IntegerField(source='exam.id', read_only=True)
+    submitted_at = serializers.DateTimeField(source='end_time', format="%Y-%m-%dT%H:%M:%S", read_only=True)
+    duration = serializers.IntegerField(source='exam.duration_minutes', read_only=True)
+    questions_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ExamAttempt
+        fields = ['id', 'exam_id', 'exam_title', 'status', 'score', 'submitted_at', 'duration', 'questions_count']
+
+    def get_questions_count(self, obj):
+        return obj.exam.questions.count()

@@ -242,25 +242,42 @@ class ExamViewSet(viewsets.ModelViewSet):
     def my_result(self, request, pk=None):
 
         from django.shortcuts import get_object_or_404
-        from app_evalpro_api.models import Exam
+        from app_evalpro_api.models import Exam, Student
         
         exam = get_object_or_404(Exam, pk=pk)
         
-        # 1. Obtener al estudiante actual
-        try:
-            student = Student.objects.get(user=request.user)
-        except Student.DoesNotExist:
-            return Response(
-                {"error": "Solo los alumnos pueden ver resultados."}, 
-                status=status.HTTP_403_FORBIDDEN
-            )
+        # 1. Verificar si se solicita ver los resultados de un alumno específico (Profesor/Admin)
+        student_id_param = request.query_params.get('student_id')
+        if student_id_param:
+            is_teacher_or_admin = request.user.groups.filter(name__in=['maestro', 'administrador']).exists()
+            if not is_teacher_or_admin:
+                return Response(
+                    {"error": "No tienes permiso para ver resultados de otros alumnos."}, 
+                    status=status.HTTP_403_FORBIDDEN
+                )
+            try:
+                student = Student.objects.get(id=student_id_param)
+            except Student.DoesNotExist:
+                return Response(
+                    {"error": "El estudiante solicitado no existe."}, 
+                    status=status.HTTP_404_NOT_FOUND
+                )
+        else:
+            # 1. Obtener al estudiante actual (Modo alumno)
+            try:
+                student = Student.objects.get(user=request.user)
+            except Student.DoesNotExist:
+                return Response(
+                    {"error": "Solo los alumnos pueden ver resultados o debes proveer student_id."}, 
+                    status=status.HTTP_403_FORBIDDEN
+                )
 
         # 2. Buscar el intento de este estudiante para este examen
         try:
             attempt = ExamAttempt.objects.get(exam=exam, student=student)
         except ExamAttempt.DoesNotExist:
             return Response(
-                {"error": "Aún no has contestado este examen."}, 
+                {"error": "El alumno no ha contestado este examen."}, 
                 status=status.HTTP_404_NOT_FOUND
             )
 
@@ -424,3 +441,58 @@ class AnswerOptionViewSet(viewsets.ModelViewSet):
             return AnswerOption.objects.all()
         
         return AnswerOption.objects.filter(question__exam__subject__created_by=user)
+
+class StudentAnswerViewSet(viewsets.ViewSet):
+    permission_classes = [IsAuthenticated]
+
+    @action(detail=True, methods=['patch'])
+    def grade(self, request, pk=None):
+        from app_evalpro_api.models import StudentAnswer
+        from django.shortcuts import get_object_or_404
+        from django.db import transaction
+        
+        # Validar permisos
+        is_teacher_or_admin = request.user.groups.filter(name__in=['maestro', 'administrador']).exists()
+        if not is_teacher_or_admin:
+            return Response(
+                {"error": "Solo maestros y administradores pueden calificar respuestas."}, 
+                status=status.HTTP_403_FORBIDDEN
+            )
+            
+        student_answer = get_object_or_404(StudentAnswer, pk=pk)
+        points_earned = request.data.get('points_earned')
+        
+        if points_earned is None:
+            return Response({"error": "Debes proveer points_earned."}, status=status.HTTP_400_BAD_REQUEST)
+            
+        try:
+            points_earned = float(points_earned)
+        except ValueError:
+            return Response({"error": "points_earned debe ser un número."}, status=status.HTTP_400_BAD_REQUEST)
+            
+        # Transacción segura para recalcular el score del intento
+        with transaction.atomic():
+            # Actualizamos la respuesta individual
+            student_answer.points_earned = points_earned
+            student_answer.needs_manual_review = False
+            student_answer.is_correct = points_earned > 0
+            student_answer.save()
+            
+            # Recalculamos el total del intento del examen
+            attempt = student_answer.attempt
+            all_answers = attempt.answers.all()
+            
+            total_score = sum(ans.points_earned for ans in all_answers)
+            attempt.score = total_score
+            
+            # Revisar si aún quedan respuestas pendientes de calificar
+            if not all_answers.filter(needs_manual_review=True).exists():
+                attempt.status = 'completed'
+                
+            attempt.save()
+            
+        return Response({
+            "message": "Respuesta calificada exitosamente", 
+            "new_score": attempt.score, 
+            "attempt_status": attempt.status
+        }, status=status.HTTP_200_OK)

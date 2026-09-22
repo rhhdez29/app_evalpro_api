@@ -9,7 +9,7 @@ from .views.bootstrap import VersionView
 from .views.teachers import TeachersView
 from .views.students import StudentsView
 from .views.subjects import SubjectViewSet
-from .views.exams import ExamViewSet, QuestionViewSet, AnswerOptionViewSet
+from .views.exams import ExamViewSet, QuestionViewSet, AnswerOptionViewSet, StudentAnswerViewSet
 from .views.users import UserListViewSet
 from .views.auth import CustomAuthToken, Logout
 
@@ -21,6 +21,7 @@ router.register(r'exams', ExamViewSet, basename='exam');
 router.register(r'questions', QuestionViewSet, basename='question')
 router.register(r'options', AnswerOptionViewSet, basename='option')
 router.register(r'users', UserListViewSet, basename='user')
+router.register(r'student-answers', StudentAnswerViewSet, basename='student-answer')
 
 # para obtener los examenes de una materia
 # {{http}}://{{host}}/exams/?subject=4
