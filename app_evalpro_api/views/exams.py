@@ -7,10 +7,12 @@ from rest_framework.decorators import action
 from app_evalpro_api.models import Student, SubjectEnrollment, Exam, ExamAttempt, StudentAnswer, AnswerOption, Question
 from django.shortcuts import get_object_or_404
 from django.db import transaction
+from app_evalpro_api.pagination import Pagination4
 
 
 class ExamViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
+    pagination_class = Pagination4
 
     def get_queryset(self):
         user = self.request.user

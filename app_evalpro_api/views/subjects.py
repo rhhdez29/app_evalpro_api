@@ -9,11 +9,49 @@ from rest_framework.decorators import action
 
 from django.utils import timezone
 
+from app_evalpro_api.pagination import Pagination10, Pagination6, Pagination4, Pagination3
 
 class SubjectViewSet(viewsets.ModelViewSet):
 
     # Protegemos la ruta para que solo usuarios logueados la vean
     permission_classes = [IsAuthenticated] 
+
+    @property
+    def paginator(self):
+        """Sobrescribe el paginador para usar la clase dinámica"""
+        if not hasattr(self, '_paginator'):
+            if hasattr(self, 'get_pagination_class'):
+                pagination_class = self.get_pagination_class()
+            else:
+                pagination_class = getattr(self, 'pagination_class', None)
+
+            if pagination_class is None:
+                self._paginator = None
+            else:
+                self._paginator = pagination_class()
+        return self._paginator
+
+    def get_pagination_class(self):
+        """Asigna la paginación de acuerdo a la acción o rol"""
+        if self.action == 'enrolled_students':
+            return Pagination10
+        if self.action == 'student_exams':
+            return Pagination3
+        if self.action == 'student_grades':
+            return Pagination3
+            
+        user = self.request.user
+        if not user or not user.is_authenticated:
+            return None
+            
+        if user.groups.filter(name='administrador').exists():
+            return Pagination10
+        if hasattr(user, 'teacher_profile'):
+            return Pagination6
+        if hasattr(user, 'student_profile'):
+            return Pagination4
+            
+        return Pagination10 
 
     def get_queryset(self):
         user = self.request.user
@@ -125,15 +163,15 @@ class SubjectViewSet(viewsets.ModelViewSet):
         enrollments = SubjectEnrollment.objects.filter(
             subject=subject
         ).select_related('student__user')
-        #3. si no hay alumnos lanzamos ese mensaje
         if not enrollments.exists():
-            return Response(
-                ([])
-            )
+            return Response([])
 
-        # 4. Si hay alumnos mandamos la lista 
+        page = self.paginate_queryset(enrollments)
+        if page is not None:
+            serializer = EnrolledStudentSerializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
         serializer = EnrolledStudentSerializer(enrollments, many=True)
-        
         return Response(serializer.data)
 
     @action(detail=True, methods=['get'])
@@ -187,6 +225,11 @@ class SubjectViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_200_OK
             )
 
+        page = self.paginate_queryset(exams)
+        if page is not None:
+            serializer = StudentPendingExamSerializer(page, many=True, context={'request': request})
+            return self.get_paginated_response(serializer.data)
+
         # 6. Serializamos y devolvemos la lista
         serializer = StudentPendingExamSerializer(exams, many=True, context={'request': request})
         return Response(serializer.data, status=status.HTTP_200_OK)
@@ -220,6 +263,11 @@ class SubjectViewSet(viewsets.ModelViewSet):
             exam__subject=subject,
             status__in=['completed', 'needs_grading', 'annulled_by_fraud']
         ).select_related('exam').order_by('-end_time')
+
+        page = self.paginate_queryset(attempts)
+        if page is not None:
+            serializer = StudentGradeSerializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
 
         serializer = StudentGradeSerializer(attempts, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
