@@ -202,18 +202,18 @@ class SubjectViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_403_FORBIDDEN
             )
 
-        # 4. Obtenemos solo los exámenes publicados
+        # 4. Obtenemos solo los exámenes publicados/programados que ya hayan iniciado (incluye disponibles y vencidos)
         exams = Exam.objects.filter(
             subject=subject,
-            status='scheduled',  # Solo publicados
-            start_date__lte=now, # Fecha inicio menor o igual a la actual
+            status__in=['scheduled', 'published'],
+            start_date__lte=now # Fecha inicio menor o igual a la actual
         )
 
         # 4.1 Excluir exámenes donde el alumno ya tiene un intento finalizado
         finished_exam_ids = ExamAttempt.objects.filter(
             student=student,
             exam__subject=subject,
-            status__in=['completed', 'needs_grading', 'annulled_by_fraud']
+            status__in=['completed', 'needs_grading', 'annulled_by_fraud', 'annulled']
         ).values_list('exam_id', flat=True)
 
         exams = exams.exclude(id__in=finished_exam_ids)

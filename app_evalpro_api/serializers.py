@@ -40,9 +40,7 @@ class SubjectListSerializer(serializers.ModelSerializer):
     teacher_name = serializers.SerializerMethodField()
     students_count = serializers.SerializerMethodField()
     exams_count = serializers.SerializerMethodField()
-    next_exam_date = serializers.SerializerMethodField()
-
-    # Nota: exams_count lo agregaremos cuando creemos la tabla Exam
+    has_active_exam = serializers.SerializerMethodField()
 
     class Meta:
         model = Subject
@@ -55,10 +53,10 @@ class SubjectListSerializer(serializers.ModelSerializer):
             'teacher_name', 
             'students_count', 
             'exams_count',
-            'next_exam_date'
+            'has_active_exam'
         )
         # Protegemos los campos que no deben enviarse en el POST
-        read_only_fields = ('id', 'created_by', 'teacher_name', 'students_count', 'next_exam_date')
+        read_only_fields = ('id', 'created_by', 'teacher_name', 'students_count', 'has_active_exam')
 
     def get_teacher_name(self, obj):
         # Une el nombre y apellido del creador
@@ -76,30 +74,28 @@ class SubjectListSerializer(serializers.ModelSerializer):
         
         return 0
         
-    def get_next_exam_date(self, obj):
+    def get_has_active_exam(self, obj):
         request = self.context.get('request')
         if not request or not request.user.is_authenticated:
-            return None
+            return False
             
         try:
             student = request.user.student_profile
         except AttributeError:
-            return None
+            return False
             
         now = timezone.now()
         
-        upcoming_exam = obj.exams.filter(
-            status='scheduled',
+        active_exam = obj.exams.filter(
+            status__in=['scheduled', 'published'],
+            start_date__lte=now,
             end_date__gt=now
         ).exclude(
             attempts__student=student,
-            attempts__status__in=['completed', 'annulled_by_fraud', 'annulled']
-        ).order_by('end_date').first()
+            attempts__status__in=['completed', 'needs_grading', 'annulled_by_fraud', 'annulled']
+        ).exists()
         
-        if upcoming_exam:
-            return upcoming_exam.end_date
-            
-        return None
+        return active_exam
     
 #Serializador para obtener los detalles de una materia
 class SubjectDetailSerializer(serializers.ModelSerializer):
