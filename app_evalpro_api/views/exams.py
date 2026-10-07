@@ -167,6 +167,17 @@ class ExamViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_403_FORBIDDEN
             )
 
+        # 1.1 Validar si la fecha/hora de finalización del examen ya transcurrió
+        from django.utils import timezone
+        from django.utils.timezone import localtime
+        now = timezone.now()
+        if exam.end_date and now > exam.end_date:
+            hora_limite = localtime(exam.end_date).strftime('%H:%M')
+            return Response(
+                {"detail": f"El tiempo límite para entregar este examen ha expirado a las {hora_limite}."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         # 2. Manejo del Ciclo de Vida del Intento
         attempt = ExamAttempt.objects.filter(student=student, exam=exam).first()
         

@@ -59,8 +59,12 @@ class SubjectViewSet(viewsets.ModelViewSet):
         if not user.is_authenticated:
             return Subject.objects.none()
 
-        # Si es administrador, se veran TODAS las materias
+        # Si es administrador
         if user.groups.filter(name='administrador').exists():
+            # Si pide "solo las mías" (vista Mis Materias del maestro), filtrar por created_by
+            if self.request.query_params.get('mine') == 'true':
+                return Subject.objects.filter(created_by=user)
+            # Por defecto el admin ve todas (Gestión de Materias)
             return Subject.objects.all()
 
         # Si es Maestro, ve solo las materias que ÉL creó
