@@ -2,15 +2,12 @@ from django.db import transaction
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 # Importamos los parsers para poder recibir archivos
-from rest_framework.parsers import MultiPartParser, FormParser 
 from django.contrib.auth.models import Group, User
 from app_evalpro_api.models import Student
 from app_evalpro_api.serializers import StudentSerializer
 from rest_framework.decorators import action
 
 class StudentsView(generics.CreateAPIView):
-    #Con esto le decimos a Django que vamos a recibir archivos y datos de formulario, no un JSON puro.
-    parser_classes = (MultiPartParser, FormParser)
 
     @transaction.atomic
     def post(self, request, *args, **kwargs):
@@ -25,9 +22,6 @@ class StudentsView(generics.CreateAPIView):
         id_student = data.get('id_student')
         career = data.get('career')
         semester = data.get('semester')
-        
-        # LOS ARCHIVOS vienen separados en request.FILES
-        kardex_file = request.FILES.get('kardex') 
 
         # Verificamos si el correo ya existe
         existing_user = User.objects.filter(email=email).first()
@@ -46,13 +40,11 @@ class StudentsView(generics.CreateAPIView):
         user.groups.add(group)
 
         # 3. Creamos el perfil de Alumno
-        # Al pasarle kardex_file, Django automáticamente lo guarda en la carpeta y escribe la ruta en la Base de Datos
         student = Student.objects.create(
             user=user,
             id_student=id_student,
             career=career,
-            semester=semester,
-            kardex=kardex_file 
+            semester=semester
         )
 
         return Response({"profile_created_id": student.id, "message": "Alumno registrado exitosamente"}, status=status.HTTP_201_CREATED)

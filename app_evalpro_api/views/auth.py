@@ -55,8 +55,6 @@ class CustomAuthToken(ObtainAuthToken):
                 response_data['id_student'] = student.id_student
                 response_data['career'] = student.career
                 response_data['semester'] = student.semester
-                # request.build_absolute_uri() crea la URL completa (ej. http://127.0.0.1:8000/media/...)
-                response_data['kardex'] = request.build_absolute_uri(student.kardex.url) if student.kardex else None
                 
                 # Calcular exámenes próximos (ventana de 48 horas o ya iniciados)
                 now = timezone.now()

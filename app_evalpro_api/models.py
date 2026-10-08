@@ -51,7 +51,7 @@ class Student(models.Model):
     
     # Manejo del archivo Kárdex
     # upload_to le dice a Django en qué subcarpeta guardar el archivo
-    kardex = models.FileField(upload_to='kardex_pdfs/', null=True, blank=True, verbose_name="Kárdex PDF")
+
     
     creation = models.DateTimeField(auto_now_add=True, null=True, blank=True)
     update = models.DateTimeField(auto_now=True, null=True, blank=True)
@@ -129,20 +129,23 @@ class Exam(models.Model):
         if self.status == 'draft':
             return 'draft'
             
-        # Si está programado, dejamos que el tiempo decida
-        if self.status == 'scheduled':
-            now = timezone.now()
-            
+        now = timezone.now()
+        
+        # Si ya pasó la fecha de fin (ya sea scheduled o published)
+        if self.end_date and now > self.end_date:
+            return 'closed'
+
+        # Si está programado o publicado, verificamos fechas
+        if self.status in ['scheduled', 'published']:
             # Si ya pasó la fecha de inicio y no ha pasado la de fin
-            if self.start_date <= now <= self.end_date:
+            if self.start_date and self.end_date and self.start_date <= now <= self.end_date:
                 return 'published'
                 
-            # Si ya pasó la fecha de fin
-            elif now > self.end_date:
-                return 'closed'
-                
             # Si aún no llega la fecha de inicio
-            return 'scheduled'
+            if self.start_date and now < self.start_date:
+                return 'scheduled'
+                
+        return self.status
             
         return self.status    
 class Question(models.Model):

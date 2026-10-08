@@ -31,7 +31,7 @@ class StudentSerializer(serializers.ModelSerializer):
     user = UserSerializer(read_only=True)
     class Meta:
         model = Student
-        fields = ('id', 'user', 'id_student', 'career', 'semester', 'kardex', 'creation', 'update')
+        fields = ('id', 'user', 'id_student', 'career', 'semester', 'creation', 'update')
         read_only_fields = ('id', 'creation', 'update')
 
 #Serializador para obtener todas las materias que tiene un maestro 
@@ -89,7 +89,7 @@ class SubjectListSerializer(serializers.ModelSerializer):
         active_exam = obj.exams.filter(
             status__in=['scheduled', 'published'],
             start_date__lte=now,
-            end_date__gt=now
+            end_date__gte=now
         ).exclude(
             attempts__student=student,
             attempts__status__in=['completed', 'needs_grading', 'annulled_by_fraud', 'annulled']

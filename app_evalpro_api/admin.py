@@ -13,5 +13,5 @@ class TeacherAdmin(admin.ModelAdmin):
 
 @admin.register(Student)
 class StudentAdmin(admin.ModelAdmin):
-    list_display = ("id", "user", "id_student", "career", "semester", "kardex", "creation")
+    list_display = ("id", "user", "id_student", "career", "semester", "creation")
     search_fields = ("user__email", "user__first_name", "id_student", "career")

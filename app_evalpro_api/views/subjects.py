@@ -158,6 +158,38 @@ class SubjectViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_404_NOT_FOUND
             )
 
+    @action(detail=True, methods=['delete'], url_path='remove_student/(?P<student_id>[^/.]+)')
+    def remove_student(self, request, pk=None, student_id=None):
+        subject = self.get_object()
+        user = request.user
+        
+        # Seguridad: Solo el creador de la materia o un admin pueden eliminar alumnos
+        is_creator = subject.created_by == user
+        is_admin = user.groups.filter(name='administrador').exists()
+        
+        if not (is_creator or is_admin):
+            return Response(
+                {"error": "No tienes permiso para eliminar alumnos de esta materia."}, 
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        try:
+            student = Student.objects.get(id=student_id)
+            if not subject.students.filter(id=student.id).exists():
+                return Response(
+                    {"error": "El alumno no está inscrito en esta materia."}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+                
+            subject.students.remove(student)
+            return Response(status=status.HTTP_204_NO_CONTENT)
+            
+        except Student.DoesNotExist:
+            return Response(
+                {"error": "Estudiante no encontrado."}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+
     @action(detail=True, methods=['get'])
     def enrolled_students(self, request, pk=None):
         # 1. Obtenemos la materia
