@@ -285,6 +285,8 @@ class ExamDetailSerializer(serializers.ModelSerializer):
 #Serializador para listar los exámenes
 class ExamListSerializer(serializers.ModelSerializer):
     questions_count = serializers.SerializerMethodField()
+    total_students = serializers.SerializerMethodField()
+    submitted_students = serializers.SerializerMethodField()
 
     status = serializers.CharField(source='current_status', read_only=True)
 
@@ -298,14 +300,28 @@ class ExamListSerializer(serializers.ModelSerializer):
             'end_date',
             'duration_minutes',
             'status',
-            'questions_count'
+            'questions_count',
+            'total_students',
+            'submitted_students'
         ]
 
     def get_questions_count(self, obj):
         if hasattr(obj, 'questions'):
             return obj.questions.count()
-        
         return 0
+
+    def get_total_students(self, obj):
+        # Total de alumnos inscritos en la materia del examen
+        if obj.subject:
+            return obj.subject.students.count()
+        return 0
+
+    def get_submitted_students(self, obj):
+        # Alumnos que ya tienen un intento completado/enviado para este examen
+        from app_evalpro_api.models import ExamAttempt
+        return obj.attempts.filter(
+            status__in=['completed', 'needs_grading', 'annulled_by_fraud', 'annulled']
+        ).values('student').distinct().count()
     
 #Serializador para obtener todos los usuarios
 class UserListSerializer(serializers.ModelSerializer):
@@ -475,6 +491,7 @@ class SubmitAnswerSerializer(serializers.Serializer):
 #Serializador que agrupa el arreglo completo
 class SubmitExamSerializer(serializers.Serializer):
     answers = SubmitAnswerSerializer(many=True)
+    is_auto_submitted = serializers.BooleanField(default=False)
 
 #Serializador para cada respuesta individual de la revisión
 class ReviewAnswerSerializer(serializers.ModelSerializer):

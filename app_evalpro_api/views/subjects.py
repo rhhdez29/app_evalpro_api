@@ -105,6 +105,33 @@ class SubjectViewSet(viewsets.ModelViewSet):
         subject.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
+    @action(detail=False, methods=['get'])
+    def stats(self, request):
+        user = request.user
+
+        # Materias del usuario (admin solo ve las suyas)
+        if user.groups.filter(name='administrador').exists():
+            subjects_qs = Subject.objects.filter(created_by=user)
+        else:
+            subjects_qs = Subject.objects.filter(created_by=user)
+
+        total_subjects = subjects_qs.count()
+
+        # Estudiantes únicos inscritos en TODAS sus materias
+        total_students = Student.objects.filter(
+            enrolled_subjects__in=subjects_qs
+        ).distinct().count()
+
+        # Exámenes totales en todas sus materias
+        from app_evalpro_api.models import Exam
+        total_exams = Exam.objects.filter(subject__in=subjects_qs).count()
+
+        return Response({
+            "total_subjects": total_subjects,
+            "total_students": total_students,
+            "total_exams": total_exams,
+        })
+
     @action(detail=True, methods=['post'])
     def add_student(self, request, pk=None):
         # 1. Obtenemos la materia de la URL (ej: /api/subjects/5/add_student/)

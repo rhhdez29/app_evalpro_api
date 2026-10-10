@@ -212,6 +212,8 @@ class ExamAttempt(models.Model):
     start_time = models.DateTimeField(auto_now_add=True)
     end_time = models.DateTimeField(null=True, blank=True)
     
+    is_auto_submitted = models.BooleanField(default=False)
+    
     # Estados de calificación
     status = models.CharField(
         max_length=20, 

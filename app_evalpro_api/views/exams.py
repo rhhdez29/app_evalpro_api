@@ -167,16 +167,20 @@ class ExamViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_403_FORBIDDEN
             )
 
-        # 1.1 Validar si la fecha/hora de finalización del examen ya transcurrió
+        # 1.1 Validar si la fecha/hora de finalización del examen ya transcurrió (con margen de gracia de 2 minutos)
         from django.utils import timezone
         from django.utils.timezone import localtime
+        from datetime import timedelta
+        
         now = timezone.now()
-        if exam.end_date and now > exam.end_date:
-            hora_limite = localtime(exam.end_date).strftime('%H:%M')
-            return Response(
-                {"detail": f"El tiempo límite para entregar este examen ha expirado a las {hora_limite}."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        if exam.end_date:
+            limite_con_gracia = exam.end_date + timedelta(minutes=2)
+            if now > limite_con_gracia:
+                hora_limite = localtime(exam.end_date).strftime('%H:%M')
+                return Response(
+                    {"detail": f"El tiempo límite para entregar este examen ha expirado a las {hora_limite}."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
 
         # 2. Manejo del Ciclo de Vida del Intento
         attempt = ExamAttempt.objects.filter(student=student, exam=exam).first()
@@ -234,6 +238,7 @@ class ExamViewSet(viewsets.ModelViewSet):
                 attempt.end_time = timezone.now()
                 attempt.score = calificacion_temporal
                 attempt.status = 'needs_grading' if requiere_revision_manual else 'completed'
+                attempt.is_auto_submitted = serializer.validated_data.get('is_auto_submitted', False)
                 attempt.save()
 
             # 5. Respuesta de éxito para que Angular muestre la pantalla de "Terminado"
