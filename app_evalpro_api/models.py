@@ -21,6 +21,43 @@ class Administrator(models.Model):
     def __str__(self):
         return f"Admin: {self.user.first_name} {self.user.last_name} - {self.faculty}"
 
+class EmailVerification(models.Model):
+    id = models.BigAutoField(primary_key=True)
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="email_verification")
+    otp_code = models.CharField(max_length=6, null=True, blank=True, verbose_name="Código OTP")
+    is_email_verified = models.BooleanField(default=False, verbose_name="Correo Verificado")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"OTP {self.user.email}: {self.otp_code} (Verificado: {self.is_email_verified})"
+
+
+# Propiedad para acceder y asignar user.otp_code directamente
+def get_user_otp(self):
+    verification = getattr(self, 'email_verification', None)
+    return verification.otp_code if verification else None
+
+def set_user_otp(self, value):
+    verification, _ = EmailVerification.objects.get_or_create(user=self)
+    verification.otp_code = value
+    verification.save()
+
+User.otp_code = property(get_user_otp, set_user_otp)
+
+# Propiedad para acceder y asignar user.is_email_verified directamente
+def get_user_is_email_verified(self):
+    if self.is_superuser:
+        return True
+    verification = getattr(self, 'email_verification', None)
+    return verification.is_email_verified if verification else False
+
+def set_user_is_email_verified(self, value):
+    verification, _ = EmailVerification.objects.get_or_create(user=self)
+    verification.is_email_verified = value
+    verification.save()
+
+User.is_email_verified = property(get_user_is_email_verified, set_user_is_email_verified)
+
 class Teacher(models.Model):
 
     STATUS_CHOICES = (
@@ -33,6 +70,7 @@ class Teacher(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="teacher_profile")
     id_teacher = models.CharField(max_length=50, unique=True, verbose_name="Matrícula/ID del Maestro")
     faculty = models.CharField(max_length=255, verbose_name="Facultad")
+
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
     creation = models.DateTimeField(auto_now_add=True, null=True, blank=True)
     update = models.DateTimeField(auto_now=True, null=True, blank=True)

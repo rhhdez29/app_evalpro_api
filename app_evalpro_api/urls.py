@@ -11,7 +11,7 @@ from .views.students import StudentsView
 from .views.subjects import SubjectViewSet
 from .views.exams import ExamViewSet, QuestionViewSet, AnswerOptionViewSet, StudentAnswerViewSet
 from .views.users import UserListViewSet
-from .views.auth import CustomAuthToken, Logout
+from .views.auth import CustomAuthToken, Logout, VerifyEmailView, ResendOtpView
 
 # Creamos el enrutador de DRF
 router = DefaultRouter()
@@ -53,7 +53,13 @@ urlpatterns = [
     #login
     path("login/", CustomAuthToken.as_view(), name="login"),
     
-    path("logout/", Logout.as_view(), name="logout")
+    path("logout/", Logout.as_view(), name="logout"),
+    
+    # Verificación de email
+    path("api/auth/verify-email/", VerifyEmailView.as_view(), name="verify-email-api"),
+    path("verify-email/", VerifyEmailView.as_view(), name="verify-email"),
+    path("api/auth/resend-otp/", ResendOtpView.as_view(), name="resend-otp-api"),
+    path("resend-otp/", ResendOtpView.as_view(), name="resend-otp")
 ]
 
 if settings.DEBUG:

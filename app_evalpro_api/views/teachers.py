@@ -2,8 +2,11 @@ from django.db import transaction
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from django.contrib.auth.models import Group, User
-from app_evalpro_api.models import Teacher
+from app_evalpro_api.models import Teacher, EmailVerification
 from app_evalpro_api.serializers import TeacherSerializer
+import random
+from django.conf import settings
+from django.core.mail import send_mail
 
 class TeachersView(generics.CreateAPIView):
     @transaction.atomic
@@ -24,7 +27,7 @@ class TeachersView(generics.CreateAPIView):
         if existing_user:
             return Response({"message": f"El usuario con el email {email} ya existe"}, status=status.HTTP_400_BAD_REQUEST)
 
-        # 1. Creamos el usuario nativo de Django
+        # 1. Creamos el usuario nativo de Django (activo para el framework, pendiente de verificar correo)
         user = User.objects.create(
             username=email,
             email=email,
@@ -46,4 +49,20 @@ class TeachersView(generics.CreateAPIView):
             faculty=faculty
         )
 
-        return Response({"profile_created_id": teacher.id, "message": "Maestro registrado exitosamente"}, status=status.HTTP_201_CREATED)
+        # 4. Generamos OTP de 6 dígitos y lo guardamos con is_email_verified=False
+        otp_code = f"{random.randint(100000, 999999)}"
+        EmailVerification.objects.update_or_create(
+            user=user,
+            defaults={'otp_code': otp_code, 'is_email_verified': False}
+        )
+
+        # 5. Enviamos correo de verificación
+        send_mail(
+            subject="Código de verificación - EvalPro",
+            message=f"Tu código de verificación es: {otp_code}",
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[email],
+            fail_silently=False,
+        )
+
+        return Response({"profile_created_id": teacher.id, "message": "Maestro registrado exitosamente. Por favor verifica tu correo con el código OTP enviado."}, status=status.HTTP_201_CREATED)
