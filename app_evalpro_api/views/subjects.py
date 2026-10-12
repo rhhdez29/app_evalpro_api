@@ -2,6 +2,7 @@
 from rest_framework import viewsets, status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework import generics, permissions
+from rest_framework.exceptions import PermissionDenied
 from app_evalpro_api.models import Subject, SubjectEnrollment, Student, Exam, ExamAttempt
 from app_evalpro_api.serializers import SubjectListSerializer, SubjectDetailSerializer, EnrolledStudentSerializer, ExamDetailSerializer, ExamListSerializer, StudentPendingExamSerializer, StudentGradeSerializer
 from rest_framework.response import Response
@@ -89,19 +90,31 @@ class SubjectViewSet(viewsets.ModelViewSet):
         # Al crear la materia, le asignamos automáticamente como dueño al usuario del token
         serializer.save(created_by=self.request.user)
     
+    def check_object_permissions(self, request, obj):
+        super().check_object_permissions(request, obj)
+        user = request.user
+        is_admin = user.groups.filter(name='administrador').exists()
+        is_owner = obj.created_by == user
+
+        # PUT/PATCH: Estrictamente permitido solo si es el profesor titular (dueño)
+        if request.method in ['PUT', 'PATCH']:
+            if not is_owner:
+                raise PermissionDenied("Solo el profesor titular (dueño) de la materia puede editarla.")
+
+        # DELETE: Permitido para el dueño y para el admin
+        elif request.method == 'DELETE':
+            if not (is_admin or is_owner):
+                raise PermissionDenied("No tienes permiso para eliminar esta materia.")
+
+        # GET: Permitido para el dueño, admin y alumnos inscritos
+        elif request.method in ('GET', 'HEAD', 'OPTIONS'):
+            if not (is_admin or is_owner):
+                if hasattr(user, 'student_profile') and obj.students.filter(id=user.student_profile.id).exists():
+                    return
+                raise PermissionDenied("No tienes permiso para ver esta materia.")
+
     def destroy(self, request, *args, **kwargs):
         subject = self.get_object()
-        
-        user = request.user
-
-        is_admin = user.groups.filter(name='administrador').exists()
-        is_creator = subject.created_by == user
-        
-        if not (is_admin or is_creator):
-            return Response(
-                {"error": "No tienes permiso para eliminar esta materia."},
-                status=status.HTTP_403_FORBIDDEN
-            )
         subject.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 

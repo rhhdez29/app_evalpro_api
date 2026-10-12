@@ -38,6 +38,8 @@ class StudentSerializer(serializers.ModelSerializer):
 class SubjectListSerializer(serializers.ModelSerializer):
     # Campos calculados al vuelo (Solo lectura)
     teacher_name = serializers.SerializerMethodField()
+    teacher_id = serializers.IntegerField(source='created_by.id', read_only=True)
+    created_by = serializers.IntegerField(source='created_by.id', read_only=True)
     students_count = serializers.SerializerMethodField()
     exams_count = serializers.SerializerMethodField()
     has_active_exam = serializers.SerializerMethodField()
@@ -51,12 +53,14 @@ class SubjectListSerializer(serializers.ModelSerializer):
             'color',
             'department', 
             'teacher_name', 
+            'teacher_id',
+            'created_by',
             'students_count', 
             'exams_count',
             'has_active_exam'
         )
         # Protegemos los campos que no deben enviarse en el POST
-        read_only_fields = ('id', 'created_by', 'teacher_name', 'students_count', 'has_active_exam')
+        read_only_fields = ('id', 'created_by', 'teacher_id', 'teacher_name', 'students_count', 'has_active_exam')
 
     def get_teacher_name(self, obj):
         # Une el nombre y apellido del creador
@@ -101,6 +105,8 @@ class SubjectListSerializer(serializers.ModelSerializer):
 class SubjectDetailSerializer(serializers.ModelSerializer):
     # Calculamos los datos extra que tu Angular está esperando
     teacher_name = serializers.SerializerMethodField()
+    teacher_id = serializers.IntegerField(source='created_by.id', read_only=True)
+    created_by = serializers.IntegerField(source='created_by.id', read_only=True)
     students_count = serializers.SerializerMethodField()
     exams_count = serializers.SerializerMethodField()
 
@@ -114,6 +120,8 @@ class SubjectDetailSerializer(serializers.ModelSerializer):
             'color', 
             'department', 
             'teacher_name', 
+            'teacher_id',
+            'created_by',
             'students_count', 
             'exams_count'
         ]

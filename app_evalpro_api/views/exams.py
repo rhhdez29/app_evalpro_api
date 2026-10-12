@@ -1,5 +1,6 @@
 from rest_framework import viewsets, status
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.exceptions import PermissionDenied
 from app_evalpro_api.models import Exam, Question, AnswerOption
 from app_evalpro_api.serializers import (ExamDetailSerializer, ExamListSerializer, QuestionSerializer, AswerQuestionSerializer, StudentExamDetailSerializer, SubmitExamSerializer, ExamAttemptReviewSerializer)
 from rest_framework.response import Response
@@ -39,16 +40,22 @@ class ExamViewSet(viewsets.ModelViewSet):
         return ExamDetailSerializer
     
     def perform_create(self, serializer):
+        subject = serializer.validated_data.get('subject')
+        if not subject or subject.created_by != self.request.user:
+            raise PermissionDenied("Solo el profesor titular de la materia puede crear exámenes para ella.")
         serializer.save(created_by=self.request.user)
+
+    def check_object_permissions(self, request, obj):
+        super().check_object_permissions(request, obj)
+        if request.method in ['PUT', 'PATCH', 'DELETE']:
+            if obj.subject.created_by != request.user:
+                raise PermissionDenied("Solo el profesor titular de la materia puede gestionar este examen.")
 
     def destroy(self, request, *args, **kwargs):
         exam = self.get_object()
 
-        if exam.created_by != request.user:
-            return Response(
-                {"error": "No tienes permiso para eliminar este examen."},
-                status=status.HTTP_403_FORBIDDEN
-            )
+        if exam.subject.created_by != request.user:
+            raise PermissionDenied("Solo el profesor titular de la materia puede eliminar este examen.")
         exam.delete()
         
         return Response(status=status.HTTP_204_NO_CONTENT)
@@ -114,12 +121,9 @@ class ExamViewSet(viewsets.ModelViewSet):
         # 1. Obtenemos el examen
         exam = self.get_object()
 
-        # 2. SEGURIDAD: Verificar que quien intenta cambiar el estado sea el creador
-        if exam.created_by != request.user:
-            return Response(
-                {"error": "No tienes permiso para modificar el estado de este examen."},
-                status=status.HTTP_403_FORBIDDEN
-            )
+        # 2. SEGURIDAD: Verificar que quien intenta cambiar el estado sea el profesor titular de la materia
+        if exam.subject.created_by != request.user:
+            raise PermissionDenied("Solo el profesor titular de la materia puede modificar el estado de este examen.")
 
         # 3. Leer el nuevo estado desde el cuerpo (body) de la petición
         new_status = request.data.get('status')
@@ -426,6 +430,18 @@ class QuestionViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
     serializer_class = QuestionSerializer
 
+    def perform_create(self, serializer):
+        exam = serializer.validated_data.get('exam')
+        if not exam or exam.subject.created_by != self.request.user:
+            raise PermissionDenied("Solo el profesor titular de la materia puede agregar preguntas a este examen.")
+        serializer.save()
+
+    def check_object_permissions(self, request, obj):
+        super().check_object_permissions(request, obj)
+        if request.method in ['PUT', 'PATCH', 'DELETE']:
+            if obj.exam.subject.created_by != request.user:
+                raise PermissionDenied("Solo el profesor titular de la materia puede modificar preguntas de este examen.")
+
     def get_queryset(self):
         user = self.request.user
         queryset = Question.objects.none()
@@ -452,6 +468,18 @@ class QuestionViewSet(viewsets.ModelViewSet):
 class AnswerOptionViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
     serializer_class = AswerQuestionSerializer
+
+    def perform_create(self, serializer):
+        question = serializer.validated_data.get('question')
+        if not question or question.exam.subject.created_by != self.request.user:
+            raise PermissionDenied("Solo el profesor titular de la materia puede agregar opciones a este examen.")
+        serializer.save()
+
+    def check_object_permissions(self, request, obj):
+        super().check_object_permissions(request, obj)
+        if request.method in ['PUT', 'PATCH', 'DELETE']:
+            if obj.question.exam.subject.created_by != request.user:
+                raise PermissionDenied("Solo el profesor titular de la materia puede modificar opciones de este examen.")
 
     def get_queryset(self):
         user = self.request.user
