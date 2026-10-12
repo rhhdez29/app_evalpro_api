@@ -12,6 +12,8 @@ from .views.subjects import SubjectViewSet
 from .views.exams import ExamViewSet, QuestionViewSet, AnswerOptionViewSet, StudentAnswerViewSet
 from .views.users import UserListViewSet
 from .views.auth import CustomAuthToken, Logout, VerifyEmailView, ResendOtpView
+from .views.student_stats import StudentStatsView
+from .views.teacher_stats import TeacherPerformanceStatsView
 
 # Creamos el enrutador de DRF
 router = DefaultRouter()
@@ -59,7 +61,15 @@ urlpatterns = [
     path("api/auth/verify-email/", VerifyEmailView.as_view(), name="verify-email-api"),
     path("verify-email/", VerifyEmailView.as_view(), name="verify-email"),
     path("api/auth/resend-otp/", ResendOtpView.as_view(), name="resend-otp-api"),
-    path("resend-otp/", ResendOtpView.as_view(), name="resend-otp")
+    path("resend-otp/", ResendOtpView.as_view(), name="resend-otp"),
+
+    # Estadísticas del alumno
+    path("api/student/stats/", StudentStatsView.as_view(), name="student-stats-api"),
+    path("student/stats/", StudentStatsView.as_view(), name="student-stats"),
+
+    # Estadísticas del profesor
+    path("api/teacher/performance-stats/", TeacherPerformanceStatsView.as_view(), name="teacher-performance-stats-api"),
+    path("teacher/performance-stats/", TeacherPerformanceStatsView.as_view(), name="teacher-performance-stats"),
 ]
 
 if settings.DEBUG:
